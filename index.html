@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Readiness — Skill Gap Diagnostic & Placement Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            surface: "#fcf9f4", "surface-dim": "#dcdad5", "surface-bright": "#fcf9f4",
+            "surface-container-lowest": "#ffffff", "surface-container-low": "#f6f3ee",
+            "surface-container": "#f0ede9", "surface-container-high": "#ebe8e3",
+            "surface-container-highest": "#e5e2dd",
+            "on-surface": "#1c1c19", "on-surface-variant": "#43474e",
+            "inverse-surface": "#31302d", "inverse-on-surface": "#f3f0eb",
+            outline: "#74777f", "outline-variant": "#c4c6cf", "surface-tint": "#465f86",
+            primary: "#032448", "on-primary": "#ffffff",
+            "primary-container": "#1f3a5f", "on-primary-container": "#8ba4cf",
+            "inverse-primary": "#aec8f4",
+            secondary: "#9c431e", "on-secondary": "#ffffff",
+            "secondary-container": "#fd8d61", "on-secondary-container": "#732601",
+            "secondary-fixed": "#ffdbce", "on-secondary-fixed": "#380d00",
+            tertiary: "#1e2430", "on-tertiary": "#ffffff",
+            "primary-fixed": "#d5e3ff", "on-primary-fixed": "#001c3b"
+          },
+          fontFamily: {
+            display: ['"Source Serif 4"', 'serif'],
+            headline: ['"Source Serif 4"', 'serif'],
+            body: ['"Public Sans"', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #fcf9f4; color: #1c1c19; font-family: 'Public Sans', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c4c6cf; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #74777f; }
+
+    /* Responsive iframe container */
+    #preview-wrapper { transition: max-width 0.35s ease, height 0.3s ease; }
+    #preview-iframe { border: none; display: block; transition: height 0.3s ease; }
+
+    /* Card hover lift */
+    .screen-card { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+    .screen-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(3,36,72,0.1); }
+
+    /* Flow step dot animation */
+    @keyframes flowPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .flow-dot-active { animation: flowPulse 2s infinite; }
+
+    /* Viewport button active state */
+    .vp-btn-active { background: #ffffff; color: #032448; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- ═══ STICKY HEADER ═══ -->
+  <header class="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-b border-surface-container-highest">
+    <div class="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-display font-bold text-base sm:text-lg shrink-0">R</div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <span class="font-headline font-semibold text-base sm:text-lg text-primary tracking-tight truncate">Readiness</span>
+            <span class="hidden xs:inline px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-medium uppercase tracking-wider bg-surface-container-high text-on-surface-variant border border-outline-variant/30 shrink-0">Live</span>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-on-surface-variant font-mono hidden md:block truncate">Warm Editorial Advisory · 19 Screens</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="font-medium hidden sm:inline">Live</span>
+        </div>
+        <a href="#sandbox" class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container transition-colors">
+          <span class="material-symbols-outlined text-[14px]">visibility</span>
+          <span>Preview</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ HERO SECTION ═══ -->
+  <section class="border-b border-surface-container-highest bg-gradient-to-b from-surface to-surface-container-low/40 px-3 sm:px-5 lg:px-8 py-6 sm:py-8 lg:py-10">
+    <div class="max-w-[1400px] mx-auto">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-8">
+        <div class="min-w-0">
+          <span class="font-mono text-[11px] uppercase tracking-wider text-secondary font-semibold">Placement & Diagnostic Architecture</span>
+          <h1 class="text-2xl sm:text-3xl lg:text-4xl font-headline font-semibold text-primary mt-1 tracking-tight">Readiness Platform</h1>
+          <p class="text-on-surface-variant text-sm mt-1.5 max-w-2xl leading-relaxed">
+            Full-fidelity editorial experience — campus skill gap analysis, personalized placement sprints, cohort-level governance.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 font-mono text-[11px] text-on-surface-variant shrink-0">
+          <div class="bg-surface-container-lowest px-3 py-1.5 rounded-lg border border-surface-container-highest">
+            <span class="block text-secondary font-bold text-sm sm:text-base">19</span><span>Screens</span>
+          </div>
+          <div class="bg-surface-container-lowest px-3 py-1.5 rounded-lg border border-surface-container-highest">
+            <span class="block text-primary font-bold text-sm sm:text-base">14</span><span>Desktop</span>
+          </div>
+          <div class="bg-surface-container-lowest px-3 py-1.5 rounded-lg border border-surface-container-highest">
+            <span class="block text-primary font-bold text-sm sm:text-base">5</span><span>Mobile</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Flow Stepper ── -->
+      <div class="mt-6 bg-surface-container-lowest border border-surface-container-highest rounded-xl p-3 sm:p-4 overflow-x-auto">
+        <div class="flex items-center gap-1 min-w-max">
+          <span class="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold mr-2 shrink-0">Flow:</span>
+          <template id="flow-steps"></template>
+        </div>
+        <div id="flow-bar" class="flex items-center gap-0.5 sm:gap-1 min-w-max"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ INTERACTIVE SANDBOX ═══ -->
+  <section id="sandbox" class="scroll-mt-16 px-3 sm:px-5 lg:px-8 py-5 sm:py-6">
+    <div class="max-w-[1400px] mx-auto">
+      <div class="bg-surface-container-lowest border border-surface-container-highest rounded-2xl overflow-hidden shadow-sm">
+
+        <!-- Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-3 border-b border-surface-container-highest bg-surface-container-low/30">
+          <!-- Left: current screen info -->
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+              <span class="material-symbols-outlined text-[18px]">devices</span>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <h2 id="sandbox-title" class="font-headline font-semibold text-sm sm:text-base text-primary truncate">Welcome & Sign In</h2>
+                <span id="sandbox-badge" class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-semibold bg-primary-container text-on-primary shrink-0">Desktop</span>
+              </div>
+              <p id="sandbox-path" class="text-[10px] sm:text-[11px] text-on-surface-variant font-mono truncate max-w-[180px] sm:max-w-xs">/welcome_sign_in_readiness/code.html</p>
+            </div>
+          </div>
+
+          <!-- Center/Right: viewport + actions -->
+          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <!-- Viewport -->
+            <div class="inline-flex p-0.5 sm:p-1 bg-surface-container-low rounded-lg border border-surface-container-highest text-[11px] sm:text-xs">
+              <button onclick="setViewport('desktop')" id="vp-desktop" class="vp-btn vp-btn-active px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 transition-all" title="Desktop">
+                <span class="material-symbols-outlined text-[14px]">desktop_windows</span><span class="hidden sm:inline">Desktop</span>
+              </button>
+              <button onclick="setViewport('laptop')" id="vp-laptop" class="vp-btn px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-all" title="Laptop 1200px">
+                <span class="material-symbols-outlined text-[14px]">laptop</span><span class="hidden lg:inline">Laptop</span>
+              </button>
+              <button onclick="setViewport('tablet')" id="vp-tablet" class="vp-btn px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-all" title="Tablet 768px">
+                <span class="material-symbols-outlined text-[14px]">tablet_mac</span><span class="hidden lg:inline">Tablet</span>
+              </button>
+              <button onclick="setViewport('mobile')" id="vp-mobile" class="vp-btn px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-all" title="Mobile 390px">
+                <span class="material-symbols-outlined text-[14px]">smartphone</span><span class="hidden sm:inline">Mobile</span>
+              </button>
+            </div>
+
+            <!-- Step nav -->
+            <div class="flex items-center gap-1">
+              <button onclick="navStep(-1)" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" title="Previous (← key)">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+              </button>
+              <span id="step-counter" class="font-mono text-[11px] px-2 py-0.5 bg-surface-container rounded min-w-[44px] text-center">1/19</span>
+              <button onclick="navStep(1)" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" title="Next (→ key)">
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
+            </div>
+
+            <button onclick="reloadPreview()" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" title="Reload">
+              <span class="material-symbols-outlined text-[18px]">refresh</span>
+            </button>
+            <a id="open-tab-link" href="/welcome_sign_in_readiness/code.html" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-on-primary text-[11px] sm:text-xs font-semibold hover:bg-primary-container transition-colors">
+              <span class="hidden sm:inline">Open</span>
+              <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Iframe Container: auto-adjusts -->
+        <div class="bg-surface-container-low/50 flex justify-center items-start overflow-x-auto p-2 sm:p-4" style="min-height:400px;">
+          <div id="preview-wrapper" class="w-full transition-all duration-300" style="max-width:100%;">
+            <iframe
+              id="preview-iframe"
+              src="/welcome_sign_in_readiness/code.html"
+              class="w-full bg-white rounded-lg shadow-sm border border-surface-container-highest"
+              style="height:85vh; min-height:500px;"
+              allow="clipboard-read; clipboard-write"
+            ></iframe>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SCREEN GALLERY ═══ -->
+  <section class="px-3 sm:px-5 lg:px-8 py-5 sm:py-6">
+    <div class="max-w-[1400px] mx-auto space-y-4">
+
+      <!-- Header + Filters -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-headline font-semibold text-lg sm:text-xl text-primary">All Screens</h2>
+          <p class="text-xs sm:text-sm text-on-surface-variant">Click any card to preview in the sandbox above.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex p-0.5 sm:p-1 bg-surface-container-low rounded-lg border border-surface-container-highest text-[11px] sm:text-xs">
+            <button onclick="filterCat('all')" data-cat="all" class="cat-btn px-2 sm:px-3 py-1 rounded font-semibold bg-surface-container-lowest text-primary shadow-xs">All (19)</button>
+            <button onclick="filterCat('student')" data-cat="student" class="cat-btn px-2 sm:px-3 py-1 rounded text-on-surface-variant hover:text-on-surface">Student (6)</button>
+            <button onclick="filterCat('analysis')" data-cat="analysis" class="cat-btn px-2 sm:px-3 py-1 rounded text-on-surface-variant hover:text-on-surface">Analysis (4)</button>
+            <button onclick="filterCat('coordinator')" data-cat="coordinator" class="cat-btn px-2 sm:px-3 py-1 rounded text-on-surface-variant hover:text-on-surface">TPC (4)</button>
+            <button onclick="filterCat('mobile')" data-cat="mobile" class="cat-btn px-2 sm:px-3 py-1 rounded text-on-surface-variant hover:text-on-surface">Mobile (5)</button>
+          </div>
+          <div class="relative">
+            <span class="material-symbols-outlined text-[14px] text-on-surface-variant absolute left-2 top-1/2 -translate-y-1/2">search</span>
+            <input id="search" type="text" placeholder="Filter…" oninput="handleSearch(this.value)" class="pl-7 pr-3 py-1 text-xs bg-surface-container-lowest border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary w-28 sm:w-40"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards Grid -->
+      <div id="cards-grid" class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4"></div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="mt-auto border-t border-surface-container-highest bg-surface-container-low py-5 px-3 sm:px-5 lg:px-8">
+    <div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono text-on-surface-variant">
+      <div class="flex items-center gap-2">
+        <span class="font-headline font-semibold text-primary text-sm">Readiness</span>
+        <span>· Skill Gap Diagnostic Platform</span>
+      </div>
+      <span>Academic Year 2025–26</span>
+    </div>
+  </footer>
+
+  <!-- ═══ SCRIPT ═══ -->
+  <script>
+    // Screen data
+    const S = [
+      { id:'welcome', title:'Welcome & Sign In', sub:'Institutional Auth', cat:'student', vp:'desktop', path:'/welcome_sign_in_readiness/code.html', img:'/welcome_sign_in_readiness/screen.png', desc:'Main landing with College Email auth and Coordinator pathways.', flow:'desktop', fi:0 },
+      { id:'role', title:'Target Role Selection', sub:'Step 2: Benchmark Matrix', cat:'student', vp:'desktop', path:'/step_2_of_3_target_role_selection/code.html', img:'/step_2_of_3_target_role_selection/screen.png', desc:'Pick curated roles or paste custom JD to calibrate diagnostic.', flow:'desktop', fi:1 },
+      { id:'analyzing', title:'Resume Analysis', sub:'Step 3: Live Telemetry', cat:'student', vp:'desktop', path:'/analyzing_resume_reading_in_progress/code.html', img:'/analyzing_resume_reading_in_progress/screen.png', desc:'Simulated AI diagnostic with parsing progression and ledger IDs.', flow:'desktop', fi:2 },
+      { id:'home', title:'Student Dashboard', sub:'Candidate Home', cat:'student', vp:'desktop', path:'/student_home_readiness/code.html', img:'/student_home_readiness/screen.png', desc:'Sprint overview, 8-checkpoint tracker, readiness metrics.', flow:'desktop', fi:3 },
+      { id:'diagnostic', title:'Gap Analysis', sub:'Diagnostic Matrix', cat:'analysis', vp:'desktop', path:'/diagnostic_gap_analysis_aarav_sundaram/code.html', img:'/diagnostic_gap_analysis_aarav_sundaram/screen.png', desc:'Domain skill gap matrix, radar visualization, deficit priorities.', flow:'desktop', fi:4 },
+      { id:'skillmap', title:'Skill Map', sub:'Competency Lattice', cat:'analysis', vp:'desktop', path:'/skill_map_junior_frontend_developer/code.html', img:'/skill_map_junior_frontend_developer/screen.png', desc:'Complete competency map with prerequisites and electives.', flow:'desktop', fi:5 },
+      { id:'gapdetail', title:'Gap Deep Dive', sub:'React State Management', cat:'analysis', vp:'desktop', path:'/gap_detail_react_state_management/code.html', img:'/gap_detail_react_state_management/screen.png', desc:'Focused breakdown: Redux vs Zustand vs Context, learning plan.', flow:'desktop', fi:6 },
+      { id:'prioritized', title:'Prioritized Roadmap', sub:'Interview Frequency', cat:'analysis', vp:'desktop', path:'/prioritized_roadmap_junior_frontend_developer/code.html', img:'/prioritized_roadmap_junior_frontend_developer/screen.png', desc:'Milestones ordered by campus placement technical round frequency.', flow:'desktop', fi:7 },
+      { id:'6week', title:'6-Week Action Plan', sub:'Placement Sprint', cat:'student', vp:'desktop', path:'/action_roadmap_6_week_placement_plan/code.html', img:'/action_roadmap_6_week_placement_plan/screen.png', desc:'Week-by-week calendar plan aligned with impending drives.', flow:'desktop', fi:8 },
+      { id:'mentor', title:'Advisory & Mentor', sub:'Qualitative Feedback', cat:'student', vp:'desktop', path:'/advisory_mentor_guidance_readiness/code.html', img:'/advisory_mentor_guidance_readiness/screen.png', desc:'Mentor remarks, mock interview tips, behavioral guidelines.', flow:'desktop', fi:9 },
+      { id:'tpc', title:'TPC Coordinator', sub:'Placement Cell Dashboard', cat:'coordinator', vp:'desktop', path:'/cohort_readiness_tpc_coordinator_view/code.html', img:'/cohort_readiness_tpc_coordinator_view/screen.png', desc:'Batch readiness distribution, student tier filters, CGPA cuts.', flow:'desktop', fi:10 },
+      { id:'tpc_dash', title:'Coordinator Dashboard', sub:'Census & Candidate Roster', cat:'coordinator', vp:'desktop', path:'/placement_coordinator_dashboard/code.html', img:'/placement_coordinator_dashboard/screen.png', desc:'Cohort census metrics, 1,248 candidate roster, and common gap distribution.', flow:'desktop', fi:11 },
+      { id:'student_coaching', title:'Student Coaching', sub:'Rahul Verma (Data Analyst)', cat:'coordinator', vp:'desktop', path:'/student_coaching_rahul_verma/code.html', img:'/student_coaching_rahul_verma/screen.png', desc:'Pedagogical roadmap, verified evidence breakdown, and observational coaching journal.', flow:'desktop', fi:12 },
+      { id:'system_states', title:'System States & Edge Cases', sub:'Spec 04-A Core States', cat:'coordinator', vp:'desktop', path:'/system_states_edge_cases/code.html', img:'/system_states_edge_cases/screen.png', desc:'Empty repository, inline OCR parsing errors, low confidence disclaimer, and loading skeletons.', flow:'desktop', fi:13 },
+      { id:'mob_welcome', title:'Welcome (Mobile)', sub:'Mobile Sign In', cat:'mobile', vp:'mobile', path:'/welcome_sign_in_readiness_mobile/code.html', img:'/welcome_sign_in_readiness_mobile/screen.png', desc:'Streamlined mobile landing with responsive touch targets.', flow:'mobile', fi:0 },
+      { id:'mob_home', title:'Home (Mobile)', sub:'Mobile Sprint View', cat:'mobile', vp:'mobile', path:'/student_home_mobile_view/code.html', img:'/student_home_mobile_view/screen.png', desc:'Mobile candidate sprint tracking and quick checklist.', flow:'mobile', fi:1 },
+      { id:'mob_diag', title:'Diagnosis (Mobile)', sub:'Mobile Gap Matrix', cat:'mobile', vp:'mobile', path:'/skill_diagnosis_mobile_view/code.html', img:'/skill_diagnosis_mobile_view/screen.png', desc:'Mobile-adapted radar, deficit pills, recommended steps.', flow:'mobile', fi:2 },
+      { id:'mob_road', title:'Roadmap (Mobile)', sub:'Mobile Timeline', cat:'mobile', vp:'mobile', path:'/action_roadmap_mobile_view/code.html', img:'/action_roadmap_mobile_view/screen.png', desc:'Mobile sprint with collapsible weekly checkpoints.', flow:'mobile', fi:3 },
+      { id:'mob_cohort', title:'Cohort (Mobile)', sub:'TPC Mobile', cat:'mobile', vp:'mobile', path:'/cohort_readiness_mobile_view/code.html', img:'/cohort_readiness_mobile_view/screen.png', desc:'On-the-go coordinator: cohort stats, tier filters, alerts.', flow:'mobile', fi:4 }
+    ];
+
+    let curIdx = 0;
+    let curViewport = 'desktop';
+
+    // ── Flow Stepper ──────────────────────────────────────────────────────────
+    function renderFlowBar() {
+      const bar = document.getElementById('flow-bar');
+      let html = '';
+      S.forEach((s, i) => {
+        const isActive = i === curIdx;
+        const isMobile = s.vp === 'mobile';
+        const dotColor = isActive ? '#fd8d61' : isMobile ? '#4F7A5A' : '#aec8f4';
+        const dotSize = isActive ? 10 : 6;
+        html += `<button onclick="loadScreen(${i})" class="flex flex-col items-center gap-0.5 group" style="min-width:${isActive ? '48px' : '36px'};" title="${s.title}">
+          <div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;background:${dotColor};transition:all 0.2s;${isActive ? 'box-shadow:0 0 6px rgba(253,141,97,0.5);' : ''}" class="${isActive ? 'flow-dot-active' : ''}"></div>
+          <span class="text-[8px] sm:text-[9px] font-mono ${isActive ? 'text-primary font-bold' : 'text-on-surface-variant'} truncate max-w-full group-hover:text-primary transition-colors" style="max-width:48px;">${s.sub.split(' ')[0]}</span>
+        </button>`;
+        if (i < S.length - 1) {
+          html += `<div class="w-2 sm:w-4 h-px ${i < curIdx ? 'bg-primary/30' : 'bg-surface-container-highest'} self-center mt-[-6px] shrink-0"></div>`;
+        }
+      });
+      bar.innerHTML = html;
+    }
+
+    // ── Load Screen into Sandbox ──────────────────────────────────────────────
+    function loadScreen(i) {
+      curIdx = i;
+      const s = S[i];
+      const iframe = document.getElementById('preview-iframe');
+      iframe.src = s.path;
+
+      document.getElementById('sandbox-title').textContent = s.title;
+      document.getElementById('sandbox-path').textContent = s.path;
+      document.getElementById('sandbox-badge').textContent = s.vp.toUpperCase();
+      document.getElementById('sandbox-badge').className = s.vp === 'mobile'
+        ? 'px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-semibold bg-[#E8F0EA] text-[#2D5A3A] shrink-0'
+        : 'px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-semibold bg-primary-container text-on-primary shrink-0';
+      document.getElementById('open-tab-link').href = s.path;
+      document.getElementById('step-counter').textContent = `${i+1}/${S.length}`;
+
+      // Auto-switch viewport to match content type
+      if (s.vp === 'mobile' && curViewport === 'desktop') setViewport('mobile');
+      else if (s.vp === 'desktop' && curViewport === 'mobile') setViewport('desktop');
+
+      renderFlowBar();
+      highlightActiveCard(i);
+      document.getElementById('sandbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function navStep(d) {
+      let n = curIdx + d;
+      if (n < 0) n = S.length - 1;
+      if (n >= S.length) n = 0;
+      loadScreen(n);
+    }
+
+    function reloadPreview() {
+      const f = document.getElementById('preview-iframe');
+      f.src = f.src;
+    }
+
+    // ── Viewport Switcher ────────────────────────────────────────────────────
+    function setViewport(mode) {
+      curViewport = mode;
+      const w = document.getElementById('preview-wrapper');
+      const iframe = document.getElementById('preview-iframe');
+
+      document.querySelectorAll('.vp-btn').forEach(b => {
+        b.className = 'vp-btn px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-all';
+      });
+
+      const active = document.getElementById('vp-' + mode);
+      if (active) active.className = 'vp-btn vp-btn-active px-2 sm:px-2.5 py-1 rounded flex items-center gap-1 transition-all';
+
+      switch (mode) {
+        case 'desktop': w.style.maxWidth = '100%'; iframe.style.height = '85vh'; break;
+        case 'laptop':  w.style.maxWidth = '1200px'; iframe.style.height = '85vh'; break;
+        case 'tablet':  w.style.maxWidth = '768px'; iframe.style.height = '85vh'; break;
+        case 'mobile':  w.style.maxWidth = '390px'; iframe.style.height = '90vh'; break;
+      }
+    }
+
+    // ── Auto-resize iframe from postMessage ──────────────────────────────────
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'readiness-frame-height') {
+        const iframe = document.getElementById('preview-iframe');
+        if (iframe) {
+          const h = Math.max(e.data.height + 80, 500); // +80 for injected nav bar
+          iframe.style.height = h + 'px';
+        }
+      }
+    });
+
+    // ── Card Gallery ─────────────────────────────────────────────────────────
+    function renderCards(items) {
+      const grid = document.getElementById('cards-grid');
+      if (!items.length) {
+        grid.innerHTML = '<div class="col-span-full py-8 text-center text-on-surface-variant font-mono text-sm">No screens match.</div>';
+        return;
+      }
+      grid.innerHTML = items.map(s => {
+        const origIdx = S.findIndex(x => x.id === s.id);
+        const isMob = s.vp === 'mobile';
+        const badgeCls = isMob ? 'bg-[#E8F0EA] text-[#2D5A3A]' : 'bg-primary-container text-on-primary';
+        return `
+          <div class="screen-card bg-surface-container-lowest border border-surface-container-highest rounded-xl overflow-hidden flex flex-col cursor-pointer" data-idx="${origIdx}" onclick="loadScreen(${origIdx})">
+            <div class="relative aspect-[16/10] bg-surface-container-low overflow-hidden">
+              <img src="${s.img}" alt="${s.title}" class="w-full h-full object-cover object-top" loading="lazy" onerror="this.onerror=null; this.parentElement.classList.add('flex','items-center','justify-center','bg-surface-container-high'); this.outerHTML='<div class=\\'flex flex-col items-center justify-center text-center p-3 w-full h-full bg-surface-container\\'><span class=\\'material-symbols-outlined text-[32px] text-primary mb-1\\'>web_asset</span><span class=\\'font-headline font-semibold text-xs text-primary leading-tight\\'>' + s.title + '</span><span class=\\'font-mono text-[9px] text-secondary mt-1\\'>' + s.sub + '</span></div>';"/>
+              <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold uppercase tracking-wider ${badgeCls} shadow-xs">${s.vp}</span>
+            </div>
+            <div class="p-3 flex-1 flex flex-col justify-between">
+              <div>
+                <span class="font-mono text-[9px] uppercase tracking-wider text-secondary font-semibold">${s.sub}</span>
+                <h3 class="font-headline font-semibold text-[13px] sm:text-sm text-primary leading-tight mt-0.5">${s.title}</h3>
+                <p class="text-[11px] text-on-surface-variant mt-1 line-clamp-2 leading-relaxed">${s.desc}</p>
+              </div>
+              <div class="mt-2 pt-2 border-t border-surface-container-highest flex items-center justify-between">
+                <span class="text-[10px] font-mono text-on-surface-variant flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[12px]">preview</span>Sandbox
+                </span>
+                <a href="${s.path}" target="_blank" onclick="event.stopPropagation();" class="text-on-surface-variant hover:text-on-surface">
+                  <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                </a>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+      highlightActiveCard(curIdx);
+    }
+
+    function highlightActiveCard(idx) {
+      document.querySelectorAll('.screen-card').forEach(c => {
+        const ci = parseInt(c.dataset.idx);
+        c.style.outline = ci === idx ? '2px solid #032448' : 'none';
+        c.style.outlineOffset = ci === idx ? '-1px' : '0';
+      });
+    }
+
+    function filterCat(cat) {
+      document.querySelectorAll('.cat-btn').forEach(b => {
+        b.className = b.dataset.cat === cat
+          ? 'cat-btn px-2 sm:px-3 py-1 rounded font-semibold bg-surface-container-lowest text-primary shadow-xs'
+          : 'cat-btn px-2 sm:px-3 py-1 rounded text-on-surface-variant hover:text-on-surface';
+      });
+      renderCards(cat === 'all' ? S : S.filter(s => s.cat === cat));
+    }
+
+    function handleSearch(q) {
+      q = q.toLowerCase().trim();
+      if (!q) { renderCards(S); return; }
+      renderCards(S.filter(s => s.title.toLowerCase().includes(q) || s.sub.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)));
+    }
+
+    // ── Keyboard Navigation ──────────────────────────────────────────────────
+    document.addEventListener('keydown', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft') navStep(-1);
+      if (e.key === 'ArrowRight') navStep(1);
+    });
+
+    // ── Initialize ───────────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+      renderCards(S);
+      renderFlowBar();
+    });
+
+    // ── SSE Live Reload for hub page ─────────────────────────────────────────
+    try {
+      const es = new EventSource('/__live_reload');
+      es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };
+    } catch(e) {}
+  </script>
+</body>
+</html>
