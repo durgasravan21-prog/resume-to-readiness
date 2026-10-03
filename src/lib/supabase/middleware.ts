@@ -56,7 +56,10 @@ export async function updateSession(request: NextRequest) {
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));
       if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
     }
-    if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/onboarding')) {
+    if (pathname.startsWith('/onboarding') && request.cookies.get('readiness_onboarding_completed')?.value === 'true') {
+      return NextResponse.redirect(new URL('/home', request.url));
+    }
+    if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings') || pathname.startsWith('/onboarding')) {
       if (role !== 'student' && role !== 'admin') {
         return NextResponse.redirect(new URL(role === 'coordinator' ? '/tpc' : '/mentor', request.url));
       }
@@ -92,7 +95,8 @@ export async function updateSession(request: NextRequest) {
       .single();
 
     const role = profile?.role || 'student';
-    const onboardingCompleted = profile?.onboarding_completed ?? false;
+    const cookieOnboarded = request.cookies.get('readiness_onboarding_completed')?.value === 'true';
+    const onboardingCompleted = profile?.onboarding_completed || cookieOnboarded;
 
     // If onboarding is incomplete, redirect student to /onboarding unless viewing analyses
     if (role === 'student' && !onboardingCompleted && !pathname.startsWith('/onboarding') && !pathname.startsWith('/analyses') && !pathname.startsWith('/api')) {
@@ -107,7 +111,7 @@ export async function updateSession(request: NextRequest) {
       if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
     }
 
-    if (pathname.startsWith('/home') || pathname.startsWith('/analyses')) {
+    if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) {
       if (role !== 'student' && role !== 'admin') {
         return NextResponse.redirect(new URL(role === 'coordinator' ? '/tpc' : '/mentor', request.url));
       }

@@ -33,6 +33,11 @@ export default function OnboardingPage() {
 
   // Profile fields (as required by user)
   const [name, setName] = useState('');
+  const [dob, setDob] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [school10th, setSchool10th] = useState('');
   const [school10thMarks, setSchool10thMarks] = useState('');
@@ -67,6 +72,32 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // 0. Check if already completed onboarding - if so, immediately navigate away
+    const checkAlreadyOnboarded = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          if (user.email) setEmail((prev) => prev || user.email || '');
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('onboarding_completed')
+            .eq('id', user.id)
+            .single();
+          if (profile?.onboarding_completed) {
+            router.replace('/home');
+            return;
+          }
+        }
+        if (document.cookie.includes('readiness_onboarding_completed=true')) {
+          router.replace('/home');
+          return;
+        }
+      } catch (e) {
+        console.warn('Check onboarding status notice:', e);
+      }
+    };
+    checkAlreadyOnboarded();
+
     // 1. Try restoring from draft
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
@@ -74,6 +105,11 @@ export default function OnboardingPage() {
         const d = JSON.parse(saved);
         if (d.step) setStep(d.step);
         if (d.name) setName(d.name);
+        if (d.dob) setDob(d.dob);
+        if (d.phoneNumber) setPhoneNumber(d.phoneNumber);
+        if (d.email) setEmail(d.email);
+        if (d.githubUrl) setGithubUrl(d.githubUrl);
+        if (d.linkedinUrl) setLinkedinUrl(d.linkedinUrl);
         if (d.rollNumber) setRollNumber(d.rollNumber);
         if (d.school10th) setSchool10th(d.school10th);
         if (d.school10thMarks) setSchool10thMarks(d.school10thMarks);
@@ -116,6 +152,7 @@ export default function OnboardingPage() {
     const session = getSession();
     if (session) {
       setName((prev) => prev || session.name || '');
+      setEmail((prev) => prev || session.email || '');
       setRollNumber((prev) => prev || session.rollNumber || '');
       setDegree((prev) => prev || session.degree || 'B.Tech');
       setBranch((prev) => prev || session.branch || 'Computer Science & Engineering');
@@ -151,6 +188,11 @@ export default function OnboardingPage() {
     const draft = {
       step,
       name,
+      dob,
+      phoneNumber,
+      email,
+      githubUrl,
+      linkedinUrl,
       rollNumber,
       school10th,
       school10thMarks,
@@ -173,6 +215,11 @@ export default function OnboardingPage() {
   }, [
     step,
     name,
+    dob,
+    phoneNumber,
+    email,
+    githubUrl,
+    linkedinUrl,
     rollNumber,
     school10th,
     school10thMarks,
@@ -249,7 +296,11 @@ export default function OnboardingPage() {
       const profilePayload = {
         userId: user?.id || session?.id || 'usr_candidate_' + Date.now(),
         name: name.trim() || user?.user_metadata?.full_name || 'Candidate',
-        email: user?.email || session?.email || 'student@nie.ac.in',
+        email: email.trim() || user?.email || session?.email || 'student@nie.ac.in',
+        phone_number: phoneNumber.trim(),
+        dob: dob.trim(),
+        github_url: githubUrl.trim(),
+        linkedin_url: linkedinUrl.trim(),
         rollNumber: rollNumber.trim(),
         school_10th: school10th.trim(),
         school_10th_marks: school10thMarks.trim(),
@@ -393,10 +444,23 @@ export default function OnboardingPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Aarav Sundaram"
+                  placeholder="e.g. Challagolla Durga Sravan"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-body"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                  Date of Birth (DOB) * <span className="text-[10px] text-outline font-normal">(Permanent record)</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
                 />
               </div>
 
@@ -410,6 +474,60 @@ export default function OnboardingPage() {
                   placeholder="e.g. 4NI21CS042"
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                  Contact Mobile Number *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +91 98765 43210"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                  Campus / Placement Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="student@nie.ac.in"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                  GitHub Profile URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://github.com/your-username"
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                  LinkedIn Profile URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://linkedin.com/in/your-profile"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface text-xs focus:outline-none focus:border-primary font-mono"
                 />
               </div>
@@ -870,6 +988,36 @@ export default function OnboardingPage() {
                 <span className="text-on-surface-variant">Candidate Name:</span>
                 <span className="text-primary font-semibold">{name || 'N/A'}</span>
               </div>
+              {dob && (
+                <div className="flex justify-between py-1 border-b border-surface-container-highest">
+                  <span className="text-on-surface-variant">Date of Birth (DOB):</span>
+                  <span className="text-primary">{dob}</span>
+                </div>
+              )}
+              {phoneNumber && (
+                <div className="flex justify-between py-1 border-b border-surface-container-highest">
+                  <span className="text-on-surface-variant">Contact Mobile:</span>
+                  <span className="text-primary">{phoneNumber}</span>
+                </div>
+              )}
+              {email && (
+                <div className="flex justify-between py-1 border-b border-surface-container-highest">
+                  <span className="text-on-surface-variant">Placement Email:</span>
+                  <span className="text-primary">{email}</span>
+                </div>
+              )}
+              {githubUrl && (
+                <div className="flex justify-between py-1 border-b border-surface-container-highest">
+                  <span className="text-on-surface-variant">GitHub Profile:</span>
+                  <span className="text-secondary truncate max-w-[240px]">{githubUrl}</span>
+                </div>
+              )}
+              {linkedinUrl && (
+                <div className="flex justify-between py-1 border-b border-surface-container-highest">
+                  <span className="text-on-surface-variant">LinkedIn Profile:</span>
+                  <span className="text-secondary truncate max-w-[240px]">{linkedinUrl}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-surface-container-highest">
                 <span className="text-on-surface-variant">Academic Stream:</span>
                 <span className="text-primary">{degree} · {branch} ({graduationYear})</span>

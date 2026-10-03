@@ -49,6 +49,7 @@ export default function TopNav() {
         { label: 'My Analyses', href: '/analyses' },
         { label: 'Roadmap', href: '/analyses/default/roadmap' },
         { label: 'Mentor', href: '/analyses/default/mentor' },
+        { label: 'Settings', href: '/settings' },
       ];
 
   return (
@@ -135,6 +136,15 @@ export default function TopNav() {
                     {user?.role}
                   </span>
                 </div>
+
+                <Link
+                  href={isCoordinator ? '/tpc/settings' : '/settings'}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-[16px]">manage_accounts</span>
+                  <span>Profile & Settings</span>
+                </Link>
 
                 <Link
                   href={isCoordinator ? '/home' : '/tpc'}

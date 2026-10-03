@@ -15,6 +15,11 @@ export interface UserProfile {
   achievements?: string[];
   collegeName?: string;
   avatarUrl?: string;
+  phoneNumber?: string;
+  dob?: string;
+  githubUrl?: string;
+  linkedinUrl?: string;
+  onboardingCompleted?: boolean;
 }
 
 const DEFAULT_STUDENT: UserProfile = {

@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
     const role = request.cookies.get('readiness_role')?.value;
     const { pathname } = request.nextUrl;
 
-    if ((pathname.startsWith('/home') || pathname.startsWith('/analyses')) && !role) {
+    if ((pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) && !role) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     if (pathname.startsWith('/tpc') && role !== 'coordinator' && role !== 'admin') {

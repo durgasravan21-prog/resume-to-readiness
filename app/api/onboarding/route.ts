@@ -43,6 +43,13 @@ export async function POST(request: NextRequest) {
       userId,
       name,
       email,
+      phone_number,
+      phoneNumber,
+      dob,
+      github_url,
+      githubUrl,
+      linkedin_url,
+      linkedinUrl,
       rollNumber,
       school_10th,
       school_10th_marks,
@@ -179,6 +186,10 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
       role: 'student',
       onboarding_completed: true,
       roll_number: rollNumber || '',
+      phone_number: phone_number || phoneNumber || '',
+      dob: dob || '',
+      github_url: github_url || githubUrl || '',
+      linkedin_url: linkedin_url || linkedinUrl || '',
       school_10th: school_10th || '',
       school_10th_marks: school_10th_marks || '',
       school_12th: school_12th || '',
@@ -338,11 +349,37 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
       console.warn('Roadmap items insert:', e);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       analysisId,
       message: 'Onboarding completed and diagnostic analysis queued.',
     });
+
+    response.cookies.set({
+      name: 'readiness_onboarding_completed',
+      value: 'true',
+      path: '/',
+      maxAge: 31536000,
+      sameSite: 'lax',
+    });
+
+    response.cookies.set({
+      name: 'readiness_role',
+      value: 'student',
+      path: '/',
+      maxAge: 31536000,
+      sameSite: 'lax',
+    });
+
+    response.cookies.set({
+      name: 'readiness_user_id',
+      value: effectiveUserId,
+      path: '/',
+      maxAge: 31536000,
+      sameSite: 'lax',
+    });
+
+    return response;
   } catch (err: any) {
     console.error('Onboarding handler error:', err);
     return NextResponse.json({ error: err.message || 'Server error processing onboarding.' }, { status: 500 });

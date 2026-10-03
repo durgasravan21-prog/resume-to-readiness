@@ -12,6 +12,7 @@ export default function MobileTabBar({ role = 'student' }: { role?: 'student' | 
     { label: 'Analyses', href: '/analyses', icon: 'analytics' },
     { label: 'Roadmap', href: '/analyses/default/roadmap', icon: 'route' },
     { label: 'Mentor', href: '/analyses/default/mentor', icon: 'forum' },
+    { label: 'Settings', href: '/settings', icon: 'settings' },
   ];
 
   const coordinatorTabs = [
