@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+import { getSession, saveSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 
 interface TargetRole {
   id: string;
@@ -24,6 +25,7 @@ interface Company {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const supabase = createClient();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -125,13 +127,14 @@ export default function OnboardingPage() {
     setErrorMessage(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const session = getSession();
       const effectiveRoleTitle = selectedRoleId === 'custom' ? customRoleTitle : (selectedRoleObj?.title || 'Junior Frontend Developer');
 
       const profilePayload = {
-        userId: session?.id || 'usr_candidate_' + Date.now(),
-        name: name.trim() || 'Candidate',
-        email: session?.email || 'student@nie.ac.in',
+        userId: user?.id || session?.id || 'usr_candidate_' + Date.now(),
+        name: name.trim() || user?.user_metadata?.full_name || 'Candidate',
+        email: user?.email || session?.email || 'student@nie.ac.in',
         rollNumber: rollNumber.trim(),
         school_10th: school10th.trim(),
         school_10th_marks: school10thMarks.trim(),
@@ -162,6 +165,15 @@ export default function OnboardingPage() {
       if (!res.ok) {
         throw new Error(data.error || `Server responded with ${res.status}: Failed to complete onboarding.`);
       }
+
+      // Sync local session cache
+      saveSession({
+        id: user?.id || profilePayload.userId,
+        name: profilePayload.name,
+        email: profilePayload.email,
+        role: 'student',
+        collegeName: profilePayload.college_name,
+      });
 
       // Route directly to waiting analysis screen
       router.push(`/analyses/waiting/${data.analysisId}`);

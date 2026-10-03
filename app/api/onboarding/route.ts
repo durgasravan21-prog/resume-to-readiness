@@ -150,7 +150,9 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
     const { sanitizedText } = sanitizeResumePII(rawText);
 
     const supabase = await getSupabase();
-    const effectiveUserId = userId || 'usr_' + Math.random().toString(36).substring(2, 9);
+    const { data: { user } } = await supabase.auth.getUser();
+    const effectiveUserId = user?.id || userId || 'usr_' + Math.random().toString(36).substring(2, 9);
+    const effectiveEmail = user?.email || email || `${effectiveUserId}@college.edu`;
     const resumeId = 'res_' + Math.random().toString(36).substring(2, 9);
     const analysisId = 'ans_' + Math.random().toString(36).substring(2, 9);
 
@@ -172,8 +174,8 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
     // 8. Update Profile in readiness.profiles
     const profilePayload = {
       id: effectiveUserId,
-      name: name || 'Student Candidate',
-      email: email || `${effectiveUserId}@college.edu`,
+      name: name || user?.user_metadata?.full_name || 'Student Candidate',
+      email: effectiveEmail,
       role: 'student',
       onboarding_completed: true,
       roll_number: rollNumber || '',

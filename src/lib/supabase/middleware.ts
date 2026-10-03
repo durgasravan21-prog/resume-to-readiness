@@ -95,8 +95,8 @@ export async function updateSession(request: NextRequest) {
     const role = profile?.role || 'student';
     const onboardingCompleted = profile?.onboarding_completed ?? false;
 
-    // If onboarding is incomplete, redirect student to /onboarding
-    if (role === 'student' && !onboardingCompleted && !pathname.startsWith('/onboarding') && !pathname.startsWith('/api')) {
+    // If onboarding is incomplete, redirect student to /onboarding unless viewing analyses
+    if (role === 'student' && !onboardingCompleted && !pathname.startsWith('/onboarding') && !pathname.startsWith('/analyses') && !pathname.startsWith('/api')) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }
 
