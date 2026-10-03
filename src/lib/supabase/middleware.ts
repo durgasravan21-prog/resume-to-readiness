@@ -94,9 +94,28 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const role = profile?.role || 'student';
+    let role = profile?.role || 'student';
     const cookieOnboarded = request.cookies.get('readiness_onboarding_completed')?.value === 'true';
     const onboardingCompleted = profile?.onboarding_completed || cookieOnboarded;
+
+    // Allow durgasravan21@gmail.com, admins, and faculty coordinators to freely toggle views
+    const activeViewRole = request.cookies.get('readiness_role')?.value;
+    const isSpecialUser =
+      user.email === 'durgasravan21@gmail.com' ||
+      profile?.role === 'admin' ||
+      profile?.role === 'coordinator' ||
+      user.email?.includes('placement') ||
+      user.email?.includes('nie.ac.in');
+
+    if (isSpecialUser) {
+      if (pathname.startsWith('/tpc')) {
+        role = 'coordinator';
+      } else if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) {
+        role = 'student';
+      } else if (activeViewRole === 'coordinator' || activeViewRole === 'student') {
+        role = activeViewRole;
+      }
+    }
 
     // If onboarding is incomplete, redirect student to /onboarding unless viewing analyses
     if (role === 'student' && !onboardingCompleted && !pathname.startsWith('/onboarding') && !pathname.startsWith('/analyses') && !pathname.startsWith('/api')) {

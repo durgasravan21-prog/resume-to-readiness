@@ -21,8 +21,12 @@ export default function StudentHomePage() {
 
   useEffect(() => {
     const session = getSession();
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
     if (session) {
-      if (session.role === 'coordinator') {
+      if (session.role === 'coordinator' && cookieRole === 'coordinator' && session.email !== 'durgasravan21@gmail.com') {
         router.push('/tpc');
       } else {
         setUser(session);

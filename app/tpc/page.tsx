@@ -105,8 +105,17 @@ export default function CoordinatorDashboardPage() {
 
   useEffect(() => {
     const session = getSession();
-    // Route protection: students cannot open /tpc
-    if (session && session.role === 'student') {
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
+    const isAllowedCoordinator =
+      session?.email === 'durgasravan21@gmail.com' ||
+      session?.role === 'coordinator' ||
+      cookieRole === 'coordinator';
+
+    // Route protection: only redirect away if not authorized and not switching views
+    if (session && session.role === 'student' && !isAllowedCoordinator) {
       router.push('/home');
     }
   }, [router]);

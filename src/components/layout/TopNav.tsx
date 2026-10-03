@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { getSession, clearSession, UserProfile } from '@/lib/auth';
+import { getSession, saveSession, clearSession, UserProfile } from '@/lib/auth';
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -35,6 +35,24 @@ export default function TopNav() {
   };
 
   const isCoordinator = user?.role === 'coordinator' || pathname.startsWith('/tpc');
+
+  const handleToggleRole = () => {
+    setMenuOpen(false);
+    const targetRole = isCoordinator ? 'student' : 'coordinator';
+    
+    // Set cookie for middleware
+    document.cookie = `readiness_role=${targetRole}; path=/; max-age=2592000; SameSite=Lax`;
+    
+    // Update local storage session
+    if (user) {
+      const updated = { ...user, role: targetRole as any };
+      saveSession(updated);
+      setUser(updated);
+    }
+    
+    // Full redirect to initialize destination view
+    window.location.href = targetRole === 'coordinator' ? '/tpc' : '/home';
+  };
 
   const navLinks = isCoordinator
     ? [
@@ -146,14 +164,13 @@ export default function TopNav() {
                   <span>Profile & Settings</span>
                 </Link>
 
-                <Link
-                  href={isCoordinator ? '/home' : '/tpc'}
-                  onClick={() => setMenuOpen(false)}
+                <button
+                  onClick={handleToggleRole}
                   className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left"
                 >
                   <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                   <span>Switch to {isCoordinator ? 'Student View' : 'Coordinator View'}</span>
-                </Link>
+                </button>
 
                 <button
                   onClick={handleSignOut}
