@@ -1,151 +1,113 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import LowConfidenceBanner from '@/components/ui/LowConfidenceBanner';
+import { createClient } from '@/lib/supabase/client';
+import { CheckCircle, HelpCircle, XCircle, Download, ArrowRight, X } from 'lucide-react';
 
 interface SkillItem {
   id: string;
   name: string;
   status: 'strong' | 'proof' | 'missing';
-  statusLabel: string;
-  jdText: string;
-  resumeText: string;
-  sourceRef: string;
-  advisorNote: string;
+  status_label: string;
+  jd_requirement: string;
+  evidence_quote: string;
+  source_ref: string;
+  plain_explanation: string;
 }
 
-const SKILL_ITEMS: SkillItem[] = [
-  // Strong
-  {
-    id: 'skill_html',
-    name: 'Semantic HTML & Accessibility',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.1 line 14',
-    jdText: 'Must understand accessible semantic markup, ARIA roles, and keyboard navigation standards.',
-    resumeText: '“Built accessible component library complying with WCAG 2.1 AA standards including screen reader landmarks.”',
-    advisorNote: 'Direct alignment with campus placement technical requirements. Clear implementation proof.',
-  },
-  {
-    id: 'skill_css',
-    name: 'CSS Layouts & Flexbox/Grid',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.1 line 22',
-    jdText: 'Proficiency in complex responsive layouts, CSS Grid, Flexbox, and Tailwind CSS utility architectures.',
-    resumeText: '“Architected pixel-perfect dashboard layouts with CSS Grid and Tailwind, reducing CSS payload by 40%.”',
-    advisorNote: 'Verified in multiple projects. Strong understanding of modern layout primitives.',
-  },
-  {
-    id: 'skill_js',
-    name: 'JavaScript ES6+ & Async',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.1 line 31',
-    jdText: 'Deep understanding of modern JS, Promises, async/await, closures, and DOM manipulation.',
-    resumeText: '“Implemented asynchronous data pagination and debounced search filters handling 10k items smoothly.”',
-    advisorNote: 'Clear proof of async event handling and performance considerations.',
-  },
-  {
-    id: 'skill_comp',
-    name: 'Component Architecture',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.2 line 8',
-    jdText: 'Modular React component design, custom hooks, and separation of UI from business logic.',
-    resumeText: '“Authored 15+ reusable React components with encapsulated hooks and controlled input patterns.”',
-    advisorNote: 'Meets junior frontend engineering design standards cleanly.',
-  },
-  {
-    id: 'skill_rest',
-    name: 'REST API Integration',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.2 line 19',
-    jdText: 'Consuming REST APIs, handling error boundaries, loading skeletons, and HTTP status handling.',
-    resumeText: '“Integrated Axios with interceptors for JWT token refresh, network error retries, and modal notifications.”',
-    advisorNote: 'Demonstrates real-world network lifecycle awareness.',
-  },
-  {
-    id: 'skill_git',
-    name: 'Git & PR Collaboration',
-    status: 'strong',
-    statusLabel: 'Strong evidence',
-    sourceRef: 'Resume p.2 line 27',
-    jdText: 'Experience working with Git branches, PR code reviews, and conventional commit messages.',
-    resumeText: '“Contributed to team monorepo via feature branches, resolving merge conflicts and maintaining 95% pass rate on CI.”',
-    advisorNote: 'Verifiable collaborative engineering practices.',
-  },
-
-  // Needs Proof
-  {
-    id: 'react-state-management',
-    name: 'React state management',
-    status: 'proof',
-    statusLabel: 'Needs stronger proof',
-    sourceRef: 'Resume p.1 line 19',
-    jdText: 'Proficiency in global state synchronization (Redux Toolkit, Zustand, or Context API) across complex multi-step flows.',
-    resumeText: '“Utilized React useState and useContext for local widget states in coursework e-commerce store.”',
-    advisorNote: 'Campus interviewers test normalized cache and reducer patterns. Simple useState does not prove mastery for production apps.',
-  },
-  {
-    id: 'automated-unit-testing',
-    name: 'Automated Unit Testing (Jest/RTL)',
-    status: 'proof',
-    statusLabel: 'Needs stronger proof',
-    sourceRef: 'Resume p.2 line 11',
-    jdText: 'Writing unit and integration tests using Jest and React Testing Library; achieving test coverage targets.',
-    resumeText: '“Wrote basic Jest snapshot tests for header navigation component.”',
-    advisorNote: 'Lacks behavioral user event assertions and mocking tests (e.g. fireEvent, waitFor, mock handlers).',
-  },
-  {
-    id: 'performance-opt',
-    name: 'Client-side Performance Optimization',
-    status: 'proof',
-    statusLabel: 'Needs stronger proof',
-    sourceRef: 'Resume p.2 line 14',
-    jdText: 'Diagnosing render bottlenecks, React memoization (useMemo/useCallback), code-splitting, and Lighthouse audits.',
-    resumeText: '“Mentioned Lighthouse 90+ score in personal portfolio.”',
-    advisorNote: 'No metrics showing optimization of dynamic data feeds or bundle size reduction techniques.',
-  },
-
-  // Missing
-  {
-    id: 'typescript-production',
-    name: 'TypeScript in Production',
-    status: 'missing',
-    statusLabel: 'Missing',
-    sourceRef: 'Diagnostic ledger scan',
-    jdText: 'Strict type safety, generics, discriminated unions, and typing third-party API payloads.',
-    resumeText: 'No TypeScript code or typing mentions discovered in parsed resume text.',
-    advisorNote: 'High frequency in round 1 technical screen. Adding TypeScript to one existing React project will clear this gap.',
-  },
-  {
-    id: 'cicd-workflows',
-    name: 'CI/CD & Deployment Workflows',
-    status: 'missing',
-    statusLabel: 'Missing',
-    sourceRef: 'Diagnostic ledger scan',
-    jdText: 'GitHub Actions pipelines, automated test runs before merge, and production hosting on Vercel/AWS.',
-    resumeText: 'No automated workflow files, GitHub Action scripts, or pipeline configs referenced.',
-    advisorNote: 'Recruiters favor candidates with live verified deployment URLs and automated lint/test badges.',
-  },
-];
+interface AnalysisData {
+  id: string;
+  readiness_score: number;
+  confidence_score: number;
+  summary_sentence: string;
+  top_gap: string;
+  dream_role: string;
+  dream_company: string;
+}
 
 export default function SkillMapPage() {
   const router = useRouter();
   const params = useParams();
-  const analysisId = params?.id || 'default';
+  const analysisId = params?.id as string;
+  const supabase = createClient();
 
+  const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
+  const [skillItems, setSkillItems] = useState<SkillItem[]>([]);
   const [activeDrawerSkill, setActiveDrawerSkill] = useState<SkillItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const strongSkills = SKILL_ITEMS.filter((s) => s.status === 'strong');
-  const proofSkills = SKILL_ITEMS.filter((s) => s.status === 'proof');
-  const missingSkills = SKILL_ITEMS.filter((s) => s.status === 'missing');
+  useEffect(() => {
+    async function loadData() {
+      if (!analysisId) return;
+      setLoading(true);
+      
+      try {
+        const [analysisRes, itemsRes] = await Promise.all([
+          supabase.from('analyses').select('*').eq('id', analysisId).single(),
+          supabase.from('analysis_items').select('*').eq('analysis_id', analysisId)
+        ]);
+
+        let anData = analysisRes.data;
+        let itData = itemsRes.data || [];
+
+        // If not found by exact ID, fallback to most recent analysis
+        if (!anData) {
+          const { data: latestAnalysis } = await supabase
+            .from('analyses')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestAnalysis) {
+            anData = latestAnalysis;
+            const { data: fallbackItems } = await supabase
+              .from('analysis_items')
+              .select('*')
+              .eq('analysis_id', latestAnalysis.id);
+            itData = fallbackItems || [];
+          }
+        }
+
+        if (anData) setAnalysis(anData);
+        if (itData.length > 0) setSkillItems(itData);
+      } catch (e) {
+        console.warn('Error loading skill map:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [analysisId, supabase]);
+
+  if (loading) {
+    return (
+      <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-12">
+        <TopNav />
+        <main className="flex-1 w-full pt-16 bg-surface">
+          <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+            <div className="animate-pulse flex flex-col gap-8">
+              <div className="h-48 bg-surface-container-low rounded-2xl w-full"></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="h-[400px] bg-surface-container-lowest rounded-xl"></div>
+                <div className="h-[400px] bg-surface-container-lowest rounded-xl"></div>
+                <div className="h-[400px] bg-surface-container-lowest rounded-xl"></div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const strongSkills = skillItems.filter((s) => s.status === 'strong');
+  const proofSkills = skillItems.filter((s) => s.status === 'proof');
+  const missingSkills = skillItems.filter((s) => s.status === 'missing');
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-12">
@@ -162,33 +124,57 @@ export default function SkillMapPage() {
                   Competency Appraisal Ledger
                 </span>
                 <h1 className="font-headline text-2xl sm:text-3xl text-primary font-semibold tracking-tight mt-1">
-                  Junior Frontend Developer
+                  {analysis?.dream_role || 'Junior Frontend Developer'}
                 </h1>
               </div>
 
               <div className="flex items-center gap-2 font-mono text-xs text-on-surface-variant">
-                <span>Target: Razorpay Standard</span>
+                <span>Target: {analysis?.dream_company || 'Standard'}</span>
                 <span>•</span>
-                <span className="font-semibold text-primary">Readiness Index: 72/100</span>
+                <span className="font-semibold text-primary">Readiness Index: {analysis?.readiness_score || 0}/100</span>
               </div>
             </div>
 
             <p className="font-body text-sm sm:text-base text-on-surface leading-relaxed max-w-4xl border-t border-surface-container pt-3">
-              Your resume demonstrates solid foundational web competence (HTML, CSS layout, JavaScript async, and REST consumption), but lacks verifiable production proof for complex state synchronization and automated behavioral testing.
+              {analysis?.summary_sentence}
             </p>
 
             {/* Low-confidence Disclaimer */}
-            <div className="mt-5">
-              <LowConfidenceBanner
-                message="Evaluation Notice: 2 competency vectors require deeper implementation proof to reach High Match status before campus drives."
-                actionText="View target gap →"
-                actionHref={`/analyses/${analysisId}/gap/react-state-management`}
-              />
-            </div>
+            {(analysis?.confidence_score ?? 100) < 80 && (
+              <div className="mt-5">
+                <LowConfidenceBanner
+                  message="Evaluation Notice: Some competency vectors require deeper implementation proof to reach High Match status before campus drives."
+                  actionText="View target gap →"
+                  actionHref={`/analyses/${analysisId}/gap/${analysis?.top_gap || 'default'}`}
+                />
+              </div>
+            )}
           </div>
 
-          {/* 3-Column Honest Report */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          {/* Empty State or 3-Column Honest Report */}
+          {skillItems.length === 0 ? (
+            <div className="p-10 sm:p-14 rounded-2xl bg-surface-container-lowest border border-surface-variant text-center max-w-lg mx-auto space-y-4 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-surface-container-high mx-auto flex items-center justify-center text-primary">
+                <HelpCircle className="w-6 h-6 text-secondary" />
+              </div>
+              <h3 className="font-headline text-lg font-semibold text-primary">
+                No Diagnostic Ledger for this ID
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Upload your resume (PDF or DOCX) to extract technical competencies, verify evidence quotes, and generate your 6-week placement roadmap.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/analyses/new"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm"
+                >
+                  <span>Upload Resume Now</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             
             {/* Column 1: Strong Evidence */}
             <div className="flex flex-col gap-3">
@@ -213,12 +199,10 @@ export default function SkillMapPage() {
                       <h3 className="font-title text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
                         {skill.name}
                       </h3>
-                      <span className="material-symbols-outlined text-[18px] text-[#4F7A5A] shrink-0">
-                        check_circle
-                      </span>
+                      <CheckCircle className="w-[18px] h-[18px] text-[#4F7A5A] shrink-0" />
                     </div>
                     <p className="font-mono text-[11px] text-outline mt-2 truncate">
-                      {skill.sourceRef}
+                      {skill.source_ref}
                     </p>
                   </div>
                 ))}
@@ -248,12 +232,10 @@ export default function SkillMapPage() {
                       <h3 className="font-title text-sm font-semibold text-on-surface group-hover:text-secondary transition-colors">
                         {skill.name}
                       </h3>
-                      <span className="material-symbols-outlined text-[18px] text-secondary shrink-0">
-                        help_outline
-                      </span>
+                      <HelpCircle className="w-[18px] h-[18px] text-secondary shrink-0" />
                     </div>
                     <p className="font-body text-xs text-on-surface-variant mt-2 line-clamp-2 leading-relaxed">
-                      {skill.advisorNote}
+                      {skill.plain_explanation}
                     </p>
                     <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-secondary font-semibold">
                       <span>Click for evidence audit</span>
@@ -287,12 +269,10 @@ export default function SkillMapPage() {
                       <h3 className="font-title text-sm font-semibold text-on-surface group-hover:text-error transition-colors">
                         {skill.name}
                       </h3>
-                      <span className="material-symbols-outlined text-[18px] text-error shrink-0">
-                        cancel
-                      </span>
+                      <XCircle className="w-[18px] h-[18px] text-error shrink-0" />
                     </div>
                     <p className="font-body text-xs text-on-surface-variant mt-2 line-clamp-2 leading-relaxed">
-                      {skill.advisorNote}
+                      {skill.plain_explanation}
                     </p>
                   </div>
                 ))}
@@ -300,12 +280,12 @@ export default function SkillMapPage() {
             </div>
 
             {/* In-flow Action Bar (No floating sticky bar) */}
-            <div className="pt-6 border-t border-surface-variant flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="pt-6 border-t border-surface-variant flex flex-col sm:flex-row items-center justify-between gap-4 md:col-span-3">
               <button
                 onClick={() => window.print()}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-surface-variant text-on-surface font-semibold text-xs hover:bg-surface-container transition-colors shadow-xs"
               >
-                <span className="material-symbols-outlined text-[16px]">download</span>
+                <Download className="w-4 h-4" />
                 <span>Download summary (PDF)</span>
               </button>
 
@@ -314,11 +294,12 @@ export default function SkillMapPage() {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm"
               >
                 <span>See my roadmap</span>
-                <span className="material-symbols-outlined text-[16px]">east</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
           </div>
+          )}
         </div>
       </main>
 
@@ -340,14 +321,14 @@ export default function SkillMapPage() {
                     ? 'bg-[#F7EEDB] text-[#B7832F]'
                     : 'bg-[#FFDAD6] text-error'
                 }`}>
-                  {activeDrawerSkill.statusLabel}
+                  {activeDrawerSkill.status_label}
                 </span>
 
                 <button
                   onClick={() => setActiveDrawerSkill(null)}
                   className="p-1 rounded-lg hover:bg-surface-container text-on-surface-variant"
                 >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -362,7 +343,7 @@ export default function SkillMapPage() {
                     Job Requirement (Benchmark)
                   </h4>
                   <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant text-xs text-on-surface leading-relaxed">
-                    {activeDrawerSkill.jdText}
+                    {activeDrawerSkill.jd_requirement}
                   </div>
                 </div>
 
@@ -372,10 +353,10 @@ export default function SkillMapPage() {
                     <h4 className="font-mono text-[10px] uppercase text-outline font-semibold tracking-wider">
                       Extracted Evidence (From Resume)
                     </h4>
-                    <span className="font-mono text-[10px] text-outline">{activeDrawerSkill.sourceRef}</span>
+                    <span className="font-mono text-[10px] text-outline">{activeDrawerSkill.source_ref}</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant font-mono text-xs text-on-surface leading-relaxed italic">
-                    {activeDrawerSkill.resumeText}
+                    {activeDrawerSkill.evidence_quote}
                   </div>
                 </div>
 
@@ -385,7 +366,7 @@ export default function SkillMapPage() {
                     Advisor Observation & Plain Explanation
                   </h4>
                   <div className="p-3.5 rounded-xl bg-surface-container border border-surface-variant/70 text-xs text-on-surface leading-relaxed">
-                    {activeDrawerSkill.advisorNote}
+                    {activeDrawerSkill.plain_explanation}
                   </div>
                 </div>
               </div>
@@ -398,7 +379,7 @@ export default function SkillMapPage() {
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm"
               >
                 <span>Add targeted fix to roadmap</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

@@ -20,6 +20,7 @@ export default function WelcomePage() {
 
   // Auth flow states
   const [authStep, setAuthStep] = useState<'input' | 'sent'>('input');
+  const [authMode, setAuthMode] = useState<'otp' | 'link'>('otp');
   const [emailInput, setEmailInput] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -93,8 +94,14 @@ export default function WelcomePage() {
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanToken = otpInput.trim();
-    if (cleanToken.length < 6) {
-      setErrorMessage('Please enter the complete 6-digit code.');
+    const cleanEmail = emailInput.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your institutional email address.');
+      return;
+    }
+    if (cleanToken.length !== 6) {
+      setErrorMessage('Please enter the 6-digit verification code.');
       return;
     }
 
@@ -102,50 +109,30 @@ export default function WelcomePage() {
     setErrorMessage(null);
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: emailInput.trim().toLowerCase(),
-        token: cleanToken,
-        type: 'email',
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          token: cleanToken,
+        }),
       });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Verification failed. Please check your credentials and retry.');
+      }
 
       if (data.user) {
-        // Fetch or create profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, onboarding_completed')
-          .eq('id', data.user.id)
-          .single();
-
-        if (!profile) {
-          await supabase.from('profiles').insert({
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.user_metadata?.full_name || emailInput.split('@')[0],
-            role: 'student',
-            onboarding_completed: false,
-            college_id: 'col_nie',
-          });
-          router.push('/onboarding');
-          return;
-        }
-
-        if (!profile.onboarding_completed && profile.role === 'student') {
-          router.push('/onboarding');
-          return;
-        }
-
-        if (profile.role === 'coordinator') {
-          router.push('/tpc');
-        } else if (profile.role === 'mentor') {
-          router.push('/mentor');
-        } else if (profile.role === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/home');
-        }
+        saveSession({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role,
+        });
       }
+
+      router.push(data.redirectTo || (data.user?.role === 'coordinator' ? '/tpc' : '/home'));
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid or expired code. Please verify and try again.');
     } finally {
@@ -301,29 +288,116 @@ export default function WelcomePage() {
                     <div className="flex-grow border-t border-surface-container-highest"></div>
                   </div>
 
-                  {/* Email OTP Input Form */}
-                  <form onSubmit={handleSendOtp} className="space-y-2">
-                    <label className="block text-[11px] font-mono uppercase text-on-surface-variant">
-                      Campus Email Address
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        required
-                        placeholder="student@nie.ac.in"
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
-                        className="flex-1 px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface placeholder:text-outline text-xs focus:outline-none focus:border-primary font-mono"
-                      />
+                  {/* Auth Mode Tabs: Direct OTP vs Magic Link */}
+                  <div className="bg-surface-container-low p-1 rounded-xl flex gap-1 border border-surface-container-highest">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('otp')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-mono font-medium transition-all ${
+                        authMode === 'otp'
+                          ? 'bg-surface text-primary shadow-xs font-semibold'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Enter 6-Digit OTP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('link')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-mono font-medium transition-all ${
+                        authMode === 'link'
+                          ? 'bg-surface text-primary shadow-xs font-semibold'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Email Magic Link
+                    </button>
+                  </div>
+
+                  {authMode === 'otp' ? (
+                    /* Mode A: Direct OTP Entry */
+                    <form onSubmit={handleVerifyOtp} className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                          Campus Email Address
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. placement.dean@nie.ac.in or student@nie.ac.in"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface placeholder:text-outline text-xs focus:outline-none focus:border-primary font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-mono uppercase text-on-surface-variant">
+                            6-Digit Verification Code
+                          </label>
+                          <span className="text-[10px] font-mono text-secondary">
+                            Faculty default: 123456
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="123456"
+                          value={otpInput}
+                          onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                          className="w-full text-center tracking-[0.4em] text-base font-mono py-2.5 px-4 rounded-lg border border-surface-container-highest bg-surface text-primary focus:outline-none focus:border-primary font-bold"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading || !emailInput.trim() || otpInput.trim().length !== 6}
+                        className="w-full py-2.5 px-4 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <span>Verify Code & Sign In</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    /* Mode B: Send Email Magic Link */
+                    <form onSubmit={handleSendOtp} className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                          Campus Email Address
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="student@nie.ac.in"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-surface-container-highest bg-surface-container-low text-on-surface placeholder:text-outline text-xs focus:outline-none focus:border-primary font-mono"
+                        />
+                      </div>
+
                       <button
                         type="submit"
                         disabled={loading || !emailInput.trim()}
-                        className="px-4 py-2.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-primary font-semibold text-xs transition-colors shrink-0 disabled:opacity-50"
+                        className="w-full py-2.5 px-4 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                       >
-                        Send Code
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <span>Send Magic Link to Email</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
                       </button>
-                    </div>
-                  </form>
+                    </form>
+                  )}
                 </div>
               ) : (
                 /* Step 2: Magic Link Sent + Code Fallback Screen */
@@ -441,6 +515,59 @@ export default function WelcomePage() {
                     className="py-1.5 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-[11px] border border-surface-container-highest transition-colors text-center"
                   >
                     Mentor
+                  </button>
+                </div>
+              </div>
+
+              {/* Official Faculty Accounts (Fixed OTP: 123456) */}
+              <div className="mt-4 pt-3 border-t border-surface-container-highest">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-secondary font-semibold">
+                    Official Faculty Accounts (Fixed OTP: 123456)
+                  </span>
+                  <span className="text-[10px] font-mono text-on-surface-variant">
+                    Click to auto-fill
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailInput('placement.dean@nie.ac.in');
+                      setOtpInput('123456');
+                      setAuthMode('otp');
+                      setAuthStep('input');
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-left text-primary border border-surface-container-highest flex items-center justify-between transition-colors group"
+                  >
+                    <span className="font-semibold">Prof. K. R. Sharma (Head TPC)</span>
+                    <span className="text-[10px] text-on-surface-variant group-hover:text-primary">placement.dean@nie.ac.in</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailInput('cs.placement@nie.ac.in');
+                      setOtpInput('123456');
+                      setAuthMode('otp');
+                      setAuthStep('input');
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-left text-primary border border-surface-container-highest flex items-center justify-between transition-colors group"
+                  >
+                    <span className="font-semibold">Dr. Sunita Rao (CS Lead)</span>
+                    <span className="text-[10px] text-on-surface-variant group-hover:text-primary">cs.placement@nie.ac.in</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailInput('core.placement@nie.ac.in');
+                      setOtpInput('123456');
+                      setAuthMode('otp');
+                      setAuthStep('input');
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-left text-primary border border-surface-container-highest flex items-center justify-between transition-colors group"
+                  >
+                    <span className="font-semibold">Prof. Vikram Mehta (Core Lead)</span>
+                    <span className="text-[10px] text-on-surface-variant group-hover:text-primary">core.placement@nie.ac.in</span>
                   </button>
                 </div>
               </div>

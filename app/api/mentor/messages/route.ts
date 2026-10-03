@@ -35,12 +35,20 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.warn('Could not fetch mentor messages:', error);
-      return NextResponse.json({ messages: [] });
+      return NextResponse.json({ messages: [], chatStatus: 'open' });
     }
 
-    return NextResponse.json({ messages: messages || [] });
+    // Determine chat status: if only student messages exist and no mentor reply, status is 'waiting'
+    const allMessages = messages || [];
+    const hasMentorReply = allMessages.some(
+      (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
+    );
+    const hasStudentMessage = allMessages.some((m: any) => m.sender === 'student');
+    const chatStatus = hasStudentMessage && !hasMentorReply ? 'waiting_for_mentor' : 'open';
+
+    return NextResponse.json({ messages: allMessages, chatStatus });
   } catch (err: any) {
-    return NextResponse.json({ messages: [] });
+    return NextResponse.json({ messages: [], chatStatus: 'open' });
   }
 }
 
@@ -54,14 +62,38 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await getSupabase();
+
+    // If student is sending and chat is in waiting state, block further student messages
+    if (sender === 'student' || !sender) {
+      const { data: existingMessages } = await supabase
+        .from('mentor_messages')
+        .select('sender, message_text')
+        .eq('analysis_id', analysisId)
+        .order('created_at', { ascending: true });
+
+      const msgs = existingMessages || [];
+      const hasStudentMessage = msgs.some((m: any) => m.sender === 'student');
+      const hasMentorReply = msgs.some(
+        (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
+      );
+
+      // If student already sent a message and mentor hasn't replied yet, block
+      if (hasStudentMessage && !hasMentorReply) {
+        return NextResponse.json({
+          error: 'Please wait for your mentor to respond before sending another message.',
+          chatStatus: 'waiting_for_mentor',
+        }, { status: 429 });
+      }
+    }
+
     const id = 'msg_' + Math.random().toString(36).substring(2, 9);
 
     const messageRecord = {
       id,
       analysis_id: analysisId,
-      user_id: userId || 'usr_aarav_01',
+      user_id: userId || 'anonymous',
       sender: sender || 'student',
-      sender_name: senderName || (sender === 'mentor' ? 'Prof. Ravi Sharma' : 'Student Candidate'),
+      sender_name: senderName || (sender === 'mentor' ? 'Faculty Mentor' : 'Student Candidate'),
       message_text: messageText.trim(),
       action_card_json: actionCard || null,
       created_at: new Date().toISOString(),
@@ -78,23 +110,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If sent by student, send an automated acknowledgment if this is a new inquiry
-    if (sender === 'student') {
-      const ackId = 'msg_ack_' + Math.random().toString(36).substring(2, 9);
+    // If sent by student, send the automated "please wait" acknowledgment
+    if (sender === 'student' || !sender) {
+      const ackId = 'msg_sys_' + Math.random().toString(36).substring(2, 9);
       const ackMessage = {
         id: ackId,
         analysis_id: analysisId,
-        user_id: 'usr_coord_01',
-        sender: 'mentor',
-        sender_name: 'Prof. Ravi Sharma (TPC Mentor)',
-        message_text: 'Your query has been recorded and forwarded to your assigned mentor. Prof. Ravi Sharma will connect with you to review your roadmap milestones.',
-        created_at: new Date(Date.now() + 1000).toISOString(),
+        user_id: 'system',
+        sender: 'system',
+        sender_name: 'Readiness Platform',
+        message_text: 'Please wait, the faculty mentor will join shortly. Your message has been forwarded to the Training & Placement Cell. You will be notified when the mentor responds.',
+        created_at: new Date(Date.now() + 500).toISOString(),
       };
 
       await supabase.from('mentor_messages').insert(ackMessage);
+
+      return NextResponse.json({
+        success: true,
+        message: data,
+        chatStatus: 'waiting_for_mentor',
+      });
     }
 
-    return NextResponse.json({ success: true, message: data });
+    // If sent by mentor, the chat is now open for two-way conversation
+    return NextResponse.json({
+      success: true,
+      message: data,
+      chatStatus: 'open',
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
   }

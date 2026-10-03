@@ -10,7 +10,7 @@ import { getSession } from '@/lib/auth';
 
 interface ChatMessage {
   id: string;
-  sender: 'mentor' | 'student';
+  sender: 'mentor' | 'student' | 'system';
   sender_name: string;
   created_at: string;
   message_text: string;
@@ -25,15 +25,15 @@ interface ChatMessage {
 const DEFAULT_WELCOME: ChatMessage = {
   id: 'msg_welcome',
   sender: 'mentor',
-  sender_name: 'Prof. Ravi Sharma (TPC Mentor)',
+  sender_name: 'Training & Placement Cell',
   created_at: new Date().toISOString(),
-  message_text: 'Hello. I have reviewed your parsed diagnostic ledger against the campus placement benchmark. Your foundational component architecture is solid, but state management and automated test proofs require demonstration. What questions do you have regarding your preparation plan?',
+  message_text: 'Welcome to the faculty mentor consultation channel. Send a message describing your query, and the assigned placement mentor will respond shortly.',
 };
 
 const SUGGESTED_PROMPTS = [
-  'Why is React state management rated Needs stronger proof?',
-  'What should I build first to clear this gap?',
-  'How do I explain my state choices in a round 2 interview?',
+  'I need guidance on my roadmap priorities.',
+  'Can you clarify my skill gap assessment?',
+  'What should I prepare first for the upcoming drive?',
 ];
 
 export default function MentorPage() {
@@ -45,6 +45,7 @@ export default function MentorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_WELCOME]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [chatStatus, setChatStatus] = useState<'open' | 'waiting_for_mentor'>('open');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial messages from API
@@ -54,6 +55,9 @@ export default function MentorPage() {
       const data = await res.json();
       if (data.messages && data.messages.length > 0) {
         setMessages(data.messages);
+      }
+      if (data.chatStatus) {
+        setChatStatus(data.chatStatus);
       }
     } catch (e) {
       console.warn('Could not fetch messages:', e);
@@ -95,7 +99,7 @@ export default function MentorPage() {
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || inputValue.trim();
-    if (!text || sending) return;
+    if (!text || sending || chatStatus === 'waiting_for_mentor') return;
 
     setSending(true);
     if (!textToSend) setInputValue('');
@@ -104,7 +108,7 @@ export default function MentorPage() {
     const optimisticMsg: ChatMessage = {
       id: optimisticId,
       sender: 'student',
-      sender_name: session?.name || 'Aarav Sundaram',
+      sender_name: session?.name || 'Student',
       created_at: new Date().toISOString(),
       message_text: text,
     };
@@ -117,19 +121,27 @@ export default function MentorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           analysisId,
-          userId: session?.id || 'usr_aarav_01',
+          userId: session?.id || 'anonymous',
           sender: 'student',
-          senderName: session?.name || 'Aarav Sundaram',
+          senderName: session?.name || 'Student',
           messageText: text,
         }),
       });
 
-      if (!res.ok) {
-        console.error('Failed to post message to backend');
-      } else {
-        // Refresh to pick up auto-acknowledgment
-        setTimeout(fetchMessages, 1200);
+      const data = await res.json();
+
+      if (res.status === 429) {
+        // Student is blocked from sending more messages
+        setChatStatus('waiting_for_mentor');
+        return;
       }
+
+      if (data.chatStatus) {
+        setChatStatus(data.chatStatus);
+      }
+
+      // Refresh to pick up system auto-acknowledgment
+      setTimeout(fetchMessages, 800);
     } catch (err) {
       console.error('Network error sending message:', err);
     } finally {
@@ -175,13 +187,14 @@ export default function MentorPage() {
           <div className="flex-1 bg-surface-container-lowest border border-surface-variant rounded-2xl p-4 sm:p-6 mb-4 overflow-y-auto min-h-[350px] max-h-[550px] space-y-4 shadow-xs">
             {messages.map((msg) => {
               const isStudent = msg.sender === 'student';
+              const isSystem = msg.sender === 'system';
               return (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${isStudent ? 'items-end' : 'items-start'}`}
                 >
                   <div className="flex items-center gap-2 mb-1 px-1">
-                    <span className="text-[11px] font-mono text-on-surface-variant">
+                    <span className={`text-[11px] font-mono ${isSystem ? 'text-secondary font-semibold' : 'text-on-surface-variant'}`}>
                       {msg.sender_name}
                     </span>
                     <span className="text-[10px] font-mono text-outline">
@@ -191,9 +204,11 @@ export default function MentorPage() {
 
                   <div
                     className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed shadow-xs ${
-                      isStudent
-                        ? 'bg-primary text-on-primary rounded-tr-none'
-                        : 'bg-surface-container-low text-on-surface border border-surface-variant rounded-tl-none'
+                      isSystem
+                        ? 'bg-secondary/10 text-on-surface border border-secondary/30 rounded-tl-none italic'
+                        : isStudent
+                          ? 'bg-primary text-on-primary rounded-tr-none'
+                          : 'bg-surface-container-low text-on-surface border border-surface-variant rounded-tl-none'
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{msg.message_text}</p>
@@ -218,51 +233,78 @@ export default function MentorPage() {
                 </div>
               );
             })}
+
+            {/* Waiting for Mentor Indicator */}
+            {chatStatus === 'waiting_for_mentor' && (
+              <div className="flex flex-col items-start">
+                <div className="max-w-[80%] rounded-2xl p-4 bg-surface-container-high border border-outline-variant/30 rounded-tl-none">
+                  <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                    <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+                    <span className="font-mono font-semibold">Waiting for faculty mentor to join...</span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant mt-1">
+                    Your message has been forwarded. Messaging is paused until the mentor responds.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div ref={chatBottomRef} />
           </div>
 
           {/* Quick Discussion Starters */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 no-scrollbar">
-            <span className="text-[10px] font-mono uppercase text-outline shrink-0">
-              Prompt Mentor:
-            </span>
-            {SUGGESTED_PROMPTS.map((prompt, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSendMessage(prompt)}
-                disabled={sending}
-                className="px-3 py-1.5 rounded-full border border-surface-variant bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-body transition-colors shrink-0 disabled:opacity-50"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
+          {chatStatus !== 'waiting_for_mentor' && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 no-scrollbar">
+              <span className="text-[10px] font-mono uppercase text-outline shrink-0">
+                Prompt Mentor:
+              </span>
+              {SUGGESTED_PROMPTS.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendMessage(prompt)}
+                  disabled={sending}
+                  className="px-3 py-1.5 rounded-full border border-surface-variant bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-body transition-colors shrink-0 disabled:opacity-50"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Chat Input Field */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex gap-2"
-          >
-            <input
-              type="text"
-              placeholder="Ask your mentor about specific skill gaps, project architectures, or campus rounds..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              className="flex-1 px-4 py-3 rounded-xl border border-surface-variant bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:border-primary font-body"
-            />
-            <button
-              type="submit"
-              disabled={sending || !inputValue.trim()}
-              className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+          {chatStatus === 'waiting_for_mentor' ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-high border border-outline-variant/30 text-on-surface-variant">
+              <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse shrink-0"></span>
+              <p className="text-xs font-body">
+                Messaging is paused until the faculty mentor responds. You will be able to continue once a mentor joins the conversation.
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              className="flex gap-2"
             >
-              {sending && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
-              <span>Send Message</span>
-              <span className="material-symbols-outlined text-[16px]">send</span>
-            </button>
-          </form>
+              <input
+                type="text"
+                placeholder="Ask your mentor about specific skill gaps, project architectures, or campus rounds..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl border border-surface-variant bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:border-primary font-body"
+              />
+              <button
+                type="submit"
+                disabled={sending || !inputValue.trim()}
+                className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+              >
+                {sending && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
+                <span>Send Message</span>
+                <span className="material-symbols-outlined text-[16px]">send</span>
+              </button>
+            </form>
+          )}
         </div>
       </main>
 

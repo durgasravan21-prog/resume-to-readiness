@@ -26,29 +26,27 @@ export default function AnalysisWaitingPage() {
   ]);
 
   useEffect(() => {
-    // Stage 1 -> 2
+    // Dynamic progress transitions
     const t1 = setTimeout(() => {
       setCurrentStageIdx(1);
       setPercent(42);
       setTelemetryLogs((prev) => [
         ...prev,
-        'Found 14 extracted technical skills and 3 applied project repositories',
-        'Cross-referencing campus placement round 2 technical question frequency...',
+        'Validated text layer & parsed project technical bullets',
+        'Cross-referencing campus placement question frequency...',
       ]);
-    }, 1800);
+    }, 1000);
 
-    // Stage 2 -> 3
     const t2 = setTimeout(() => {
       setCurrentStageIdx(2);
       setPercent(74);
       setTelemetryLogs((prev) => [
         ...prev,
-        'Verifying verbatim evidence quotes: "Optimized complex PostgreSQL queries with window functions"',
-        'Flagging signal deficiency: React state management lacks production store proof',
+        'Verifying verbatim evidence quotes and metrics from resume...',
+        'Synthesizing competency appraisal against target rubric...',
       ]);
-    }, 3800);
+    }, 2200);
 
-    // Stage 3 -> 4
     const t3 = setTimeout(() => {
       setCurrentStageIdx(3);
       setPercent(95);
@@ -57,13 +55,13 @@ export default function AnalysisWaitingPage() {
         'Compiling prioritized 6-week action sprint roadmap...',
         'Audit complete. Preparing competency lattice report.',
       ]);
-    }, 5600);
+    }, 3400);
 
-    // Completion -> Route to Skill Map
+    // Completion check
     const t4 = setTimeout(() => {
       setPercent(100);
       router.push(`/analyses/${analysisId}`);
-    }, 7200);
+    }, 4200);
 
     return () => {
       clearTimeout(t1);

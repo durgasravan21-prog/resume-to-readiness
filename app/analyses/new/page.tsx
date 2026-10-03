@@ -63,9 +63,13 @@ export default function NewAnalysisPage() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Step 1 State: Resume File
+  const [actualFile, setActualFile] = useState<File | null>(null);
   const [resumeFile, setResumeFile] = useState<{ name: string; size: string } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingStatus, setAnalyzingStatus] = useState('');
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Step 2 State: Target Role
   const [roleTab, setRoleTab] = useState<'curated' | 'custom'>('curated');
@@ -90,6 +94,7 @@ export default function NewAnalysisPage() {
 
   const processFile = (file: File) => {
     setFileError(null);
+    setApiError(null);
     const validExtensions = ['.pdf', '.docx'];
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     
@@ -103,21 +108,70 @@ export default function NewAnalysisPage() {
       return;
     }
 
-    // Simulation of scanned image check
-    if (file.name.toLowerCase().includes('scanned')) {
-      setFileError('Unreadable text layer. Scanned images cannot be parsed. Please use an export from Word or Docs.');
-      return;
-    }
-
     const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
     setResumeFile({ name: file.name, size: sizeStr });
+    setActualFile(file);
   };
 
   const activeRoleData = CURATED_ROLES.find((r) => r.id === selectedRole) || CURATED_ROLES[0];
 
-  const handleStartAnalysis = () => {
-    const analysisId = 'anl_' + Date.now();
-    router.push(`/analyses/waiting/${analysisId}`);
+  const handleStartAnalysis = async () => {
+    if (!actualFile) {
+      setApiError('Please select or upload a valid resume file first.');
+      setCurrentStep(1);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setApiError(null);
+    setAnalyzingStatus('Validating file integrity and magic bytes...');
+
+    try {
+      const formData = new FormData();
+      formData.append('resume', actualFile);
+      formData.append('targetRoleId', selectedRole);
+
+      const dreamRole = roleTab === 'curated' ? activeRoleData.title : (customJD.slice(0, 50) || 'Custom Role');
+      const dreamCompany = roleTab === 'curated' ? activeRoleData.subtitle : 'Target Company Benchmark';
+
+      formData.append('dreamRole', dreamRole);
+      formData.append('dreamCompany', dreamCompany);
+
+      setAnalyzingStatus('Extracting text layer and parsing project bullets...');
+
+      const timer1 = setTimeout(() => {
+        setAnalyzingStatus('Evaluating skills against ' + dreamRole + ' rubric...');
+      }, 1200);
+
+      const timer2 = setTimeout(() => {
+        setAnalyzingStatus('Generating personalized action sprint roadmap...');
+      }, 2400);
+
+      const res = await fetch('/api/analyses/create', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || `Server returned ${res.status}: Failed to analyze resume.`);
+      }
+
+      setAnalyzingStatus('Analysis ledger compiled! Navigating to skill map...');
+
+      setTimeout(() => {
+        router.push(`/analyses/${data.analysisId}`);
+      }, 500);
+
+    } catch (err: any) {
+      console.error('Analysis creation error:', err);
+      setApiError(err.message || 'Error processing resume document. Please verify the document format.');
+      setIsAnalyzing(false);
+    }
   };
 
   const filteredRoles = CURATED_ROLES.filter((r) =>
@@ -526,21 +580,54 @@ export default function NewAnalysisPage() {
                   Our background extraction checks for verbatim source sentences in your resume. If a skill has no metrics or demonstrated implementation, it will be marked as "Needs stronger proof" rather than arbitrarily penalizing your readiness score.
                 </div>
 
+                {/* Error Banner */}
+                {apiError && (
+                  <div className="p-4 rounded-xl bg-error-container/20 border border-error/40 text-error text-xs font-body flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
+                    <div>
+                      <p className="font-semibold">Analysis Failed</p>
+                      <p className="mt-0.5">{apiError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress / Analyzing State */}
+                {isAnalyzing && (
+                  <div className="p-5 rounded-xl bg-surface-container-high border border-primary/30 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div>
+                      <p className="font-headline font-semibold text-sm text-primary">{analyzingStatus}</p>
+                      <p className="text-[11px] font-mono text-on-surface-variant mt-1">This typically takes 2–4 seconds</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Navigation Bar */}
                 <div className="pt-4 border-t border-surface-container-highest flex items-center justify-between">
                   <button
                     onClick={() => setCurrentStep(2)}
-                    className="text-on-surface-variant hover:text-on-surface text-xs font-semibold"
+                    disabled={isAnalyzing}
+                    className="text-on-surface-variant hover:text-on-surface text-xs font-semibold disabled:opacity-40"
                   >
                     ← Back to role selection
                   </button>
 
                   <button
                     onClick={handleStartAnalysis}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm"
+                    disabled={isAnalyzing}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-                    <span>Analyse my resume</span>
+                    {isAnalyzing ? (
+                      <>
+                        <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                        <span>Analyzing resume...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+                        <span>Analyse my resume</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

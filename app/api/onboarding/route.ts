@@ -6,6 +6,7 @@ import { extractPdfText } from '@/server/parsing/extract-pdf';
 import { extractDocxText } from '@/server/parsing/extract-docx';
 import { classifyResumeText } from '@/server/parsing/classify-resume';
 import { sanitizeResumePII } from '@/server/parsing/sanitize-pii';
+import { analyzeResumeContent } from '@/server/ai/engine';
 
 async function getSupabase() {
   const cookieStore = await cookies();
@@ -218,9 +219,16 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
       consent_text: 'Consented to campus Training & Placement Cell and assigned faculty mentor review of resume, academic credentials, and diagnostic skill gap reports.',
     });
 
-    // 10. Create Analysis Record
+    // 10. Run Real Analysis Engine against extracted resume text
     const targetRoleName = dream_role || 'Junior Frontend Developer';
     const targetComp = dream_company || 'Tier-1 Hiring Benchmark';
+
+    const analysisResult = analyzeResumeContent(
+      sanitizedText,
+      targetRoleName,
+      targetComp,
+      profilePayload
+    );
 
     const { error: analysisError } = await supabase.from('analyses').insert({
       id: analysisId,
@@ -229,122 +237,84 @@ ${rawText || 'Verified institutional academic profile and resume transcript.'}`;
       target_role_id: target_role_id || 'role_jfd',
       dream_role: targetRoleName,
       dream_company: targetComp,
-      status: 'queued',
-      readiness_score: 72,
-      confidence_score: 88,
-      summary_sentence: `Strong foundational skills detected in modern web programming. Key preparation gap identified in React State Architecture and Automated Testing.`,
-      top_gap: 'State Management & Testing Rubric',
-      is_outstanding: false,
+      status: 'done',
+      readiness_score: analysisResult.readinessScore,
+      confidence_score: analysisResult.confidenceScore,
+      summary_sentence: analysisResult.summarySentence,
+      top_gap: analysisResult.topGap,
+      is_outstanding: analysisResult.readinessScore >= 85,
     });
 
     if (analysisError) {
       console.warn('Analysis insert error:', analysisError);
     }
 
-    // 11. Populate initial Analysis Items (Skill Map)
-    const items = [
-      {
-        id: 'item_react',
-        analysis_id: analysisId,
-        name: 'React.js Component Architecture',
-        status: 'strong',
-        status_label: 'Industry Verified',
-        jd_requirement: 'Hands-on experience building multi-component web applications with functional hooks and props.',
-        evidence_quote: 'Built full-stack e-commerce portal with modular functional components and custom React hooks.',
-        source_reference: 'Section: Technical Projects (Line 14)',
-        plain_explanation: 'Strong demonstrated competence in clean modular hierarchy, dependency arrays, and reusable UI components.',
-      },
-      {
-        id: 'item_ts',
-        analysis_id: analysisId,
-        name: 'TypeScript & Type Safety',
-        status: 'strong',
-        status_label: 'Verified in Projects',
-        jd_requirement: 'Strict type contracts, interface modeling, and compile-time error minimization.',
-        evidence_quote: 'Integrated strict TypeScript interfaces for all REST payloads and API schemas.',
-        source_reference: 'Section: Project 2 (Line 28)',
-        plain_explanation: 'Clear application of interfaces, generics, and union types preventing null reference failures.',
-      },
-      {
-        id: 'item_redux',
-        analysis_id: analysisId,
-        name: 'Global State Management',
-        status: 'missing',
-        status_label: 'Placement Critical Gap',
-        jd_requirement: 'Predictable application state flow using Redux Toolkit, Zustand, or Context API.',
-        evidence_quote: 'Prop-drilling across 4 component layers; no dedicated state store identified.',
-        source_reference: 'Project Code Repository Audit',
-        plain_explanation: 'Campus drive screening tests for state immutability, selectors, and dispatched actions.',
-      },
-      {
-        id: 'item_testing',
-        analysis_id: analysisId,
-        name: 'Automated Unit & Integration Testing',
-        status: 'needs_proof',
-        status_label: 'Needs Verification',
-        jd_requirement: 'Writing unit tests with Vitest / Jest and component testing via React Testing Library.',
-        evidence_quote: 'Mentioned "testing APIs using Postman" but no automated test files found in repository.',
-        source_reference: 'Section: Skills List (Line 42)',
-        plain_explanation: 'Recruiters require automated assertions and mock fixtures, not just manual Postman runs.',
-      },
-    ];
+    // 11. Populate Real Analysis Items (Skill Map) from engine
+    const dbItems = analysisResult.competencies.map((comp) => ({
+      id: comp.id,
+      analysis_id: analysisId,
+      name: comp.name,
+      status: comp.status,
+      status_label: comp.statusLabel,
+      jd_requirement: comp.jdRequirement,
+      evidence_quote: comp.evidenceQuote,
+      source_reference: comp.sourceReference,
+      plain_explanation: comp.plainExplanation,
+    }));
 
     try {
-      await supabase.from('analysis_items').insert(items);
+      await supabase.from('analysis_items').insert(dbItems);
     } catch (e) {
       console.warn('Analysis items insert:', e);
     }
 
-    // 12. Populate Roadmap Items & Tasks
-    const roadmapItem1Id = 'rmi_' + Math.random().toString(36).substring(2, 9);
-    const roadmapItem2Id = 'rmi_' + Math.random().toString(36).substring(2, 9);
+    // 12. Populate Real Roadmap Items & Tasks from engine
+    const phaseMap: Record<string, string[]> = { prioritize: [], sequence: [], prove: [] };
+    for (const task of analysisResult.roadmapTasks) {
+      if (!phaseMap[task.phase]) phaseMap[task.phase] = [];
+      phaseMap[task.phase].push(task.id);
+    }
 
     try {
-      await supabase.from('roadmap_items').insert([
-        {
-          id: roadmapItem1Id,
-          analysis_id: analysisId,
-          phase: 'prioritize',
-          title: 'Sprint 1: State Management & Immutability Architecture',
-          description: 'Master Zustand & Redux Toolkit patterns required by frontend campus hiring tests.',
-        },
-        {
-          id: roadmapItem2Id,
-          analysis_id: analysisId,
-          phase: 'sequence',
-          title: 'Sprint 2: Automated Component Testing & Mocking',
-          description: 'Implement Vitest and React Testing Library coverage on your portfolio project.',
-        },
-      ]);
+      // Create roadmap phase items
+      const roadmapPhases = Object.entries(phaseMap)
+        .filter(([, taskIds]) => taskIds.length > 0)
+        .map(([phase]) => {
+          const phaseTitle = phase === 'prioritize'
+            ? `Phase 1: Critical Gap Remediation for ${targetRoleName}`
+            : phase === 'sequence'
+              ? `Phase 2: Depth & Architecture Validation`
+              : `Phase 3: Deployment & Portfolio Proof`;
+          return {
+            id: 'rmi_' + phase + '_' + Math.random().toString(36).substring(2, 7),
+            analysis_id: analysisId,
+            phase,
+            title: phaseTitle,
+            description: `Structured preparation tasks for ${targetRoleName} at ${targetComp}`,
+          };
+        });
 
-      await supabase.from('roadmap_tasks').insert([
-        {
-          id: 'tsk_state_1',
-          roadmap_item_id: roadmapItem1Id,
+      await supabase.from('roadmap_items').insert(roadmapPhases);
+
+      // Create individual tasks
+      const dbTasks = analysisResult.roadmapTasks.map((task) => {
+        const phaseItem = roadmapPhases.find((p) => p.phase === task.phase);
+        return {
+          id: task.id,
+          roadmap_item_id: phaseItem?.id || roadmapPhases[0]?.id,
           analysis_id: analysisId,
-          title: 'Migrate portfolio app from prop-drilling to Zustand store',
-          description: 'Create an isolated store with typed actions, persistent state, and selector subscriptions.',
-          priority: 'High',
-          hours_estimate: '6 hours',
-          evidence_outcome: 'GitHub PR link showing removed prop drilling and clean store hooks',
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          hours_estimate: task.hoursEstimate,
+          evidence_outcome: task.evidenceOutcome,
           is_completed: false,
-          due_date: new Date(Date.now() + 7 * 86400000).toISOString(),
+          due_date: task.dueDate,
           suggested_by_mentor: false,
-        },
-        {
-          id: 'tsk_test_1',
-          roadmap_item_id: roadmapItem2Id,
-          analysis_id: analysisId,
-          title: 'Write 8 Vitest unit tests for async data fetching',
-          description: 'Mock HTTP responses and verify loading, error, and success states.',
-          priority: 'Medium',
-          hours_estimate: '4 hours',
-          evidence_outcome: 'Passing test suite output with coverage report screenshot',
-          is_completed: false,
-          due_date: new Date(Date.now() + 14 * 86400000).toISOString(),
-          suggested_by_mentor: false,
-        },
-      ]);
+        };
+      });
+
+      await supabase.from('roadmap_tasks').insert(dbTasks);
     } catch (e) {
       console.warn('Roadmap items insert:', e);
     }
