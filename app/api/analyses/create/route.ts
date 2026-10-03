@@ -64,12 +64,6 @@ export async function POST(request: NextRequest) {
 
     // 3. Magic Bytes Security Validation
     const magicValid = validateFileMagicBytes(buffer, ext);
-    if (!magicValid.valid) {
-      return NextResponse.json(
-        { error: magicValid.reason || 'File header does not match declared extension. Please upload a genuine PDF or DOCX file.' },
-        { status: 400 }
-      );
-    }
 
     // 4. Real Text Extraction
     let rawText = '';
@@ -83,6 +77,14 @@ export async function POST(request: NextRequest) {
       const parsed = await extractDocxText(buffer);
       rawText = parsed.text;
       hasTextLayer = parsed.hasTextLayer;
+    }
+
+    // Only reject on magic bytes if text extraction also completely failed
+    if (!magicValid.valid && (!rawText || rawText.trim().length < 20)) {
+      return NextResponse.json(
+        { error: magicValid.reason || 'File header does not match declared extension. Please upload a genuine PDF or DOCX file.' },
+        { status: 400 }
+      );
     }
 
     if (!hasTextLayer || !rawText || rawText.trim().length < 20) {

@@ -108,7 +108,9 @@ export default function NewAnalysisPage() {
       return;
     }
 
-    const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+    const sizeStr = file.size < 1024 * 1024
+      ? `${Math.round(file.size / 1024)} KB`
+      : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
     setResumeFile({ name: file.name, size: sizeStr });
     setActualFile(file);
   };
