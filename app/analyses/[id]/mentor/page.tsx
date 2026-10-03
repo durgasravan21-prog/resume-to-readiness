@@ -74,7 +74,7 @@ export default function MentorPage() {
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'readiness',
+          schema: 'public',
           table: 'mentor_messages',
           filter: `analysis_id=eq.${analysisId}`,
         },

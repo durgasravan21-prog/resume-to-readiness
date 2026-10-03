@@ -40,8 +40,8 @@ export default function RoadmapPage() {
       setLoading(true);
       
       const [tasksRes, itemsRes] = await Promise.all([
-        supabase.schema('readiness').from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('order_index', { ascending: true }),
-        supabase.schema('readiness').from('roadmap_items').select('*').eq('analysis_id', analysisId)
+        supabase.from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('order_index', { ascending: true }),
+        supabase.from('roadmap_items').select('*').eq('analysis_id', analysisId)
       ]);
 
       let loadedTasks = tasksRes.data || [];
@@ -107,7 +107,7 @@ export default function RoadmapPage() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: newStatus } : t));
 
     // Persist to Supabase
-    const { error } = await supabase.schema('readiness')
+    const { error } = await supabase
       .from('roadmap_tasks')
       .update({ is_completed: newStatus })
       .eq('id', taskId);

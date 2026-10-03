@@ -8,9 +8,6 @@ export function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzbHVwY2NsdGhxbHR2dndqdmpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MjA0MzYsImV4cCI6MjA5ODk5NjQzNn0.XN9oa1bOtXf0ZsqViLDk5OB_xVT-wFh7GPDEFzzgtPU';
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
-    db: {
-      schema: 'readiness',
-    },
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;
@@ -41,9 +38,6 @@ export function createAdminClient() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
   return createServerClient(supabaseUrl, serviceKey, {
-    db: {
-      schema: 'readiness',
-    },
     cookies: {
       get: () => undefined,
       set: () => {},
