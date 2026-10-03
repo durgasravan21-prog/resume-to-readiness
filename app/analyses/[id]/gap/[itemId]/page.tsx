@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import { createClient } from '@/lib/supabase/client';
+import { getSession } from '@/lib/auth';
 import { Check, PlusSquare, ArrowRight, Verified, FileSearch, TrendingUp, ListChecks } from 'lucide-react';
 
 interface SkillItem {
@@ -22,9 +23,22 @@ interface SkillItem {
 export default function GapDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const analysisId = params?.id as string;
   const itemId = params?.itemId as string;
   const supabase = createClient();
+  const session = getSession();
+
+  // Read role cookie to respect TopNav persona toggle
+  const [cookieRole, setCookieRole] = useState<string>('student');
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/readiness_role=([^;]+)/);
+      if (match) setCookieRole(match[1]);
+    }
+  }, []);
+
+  const isFacultyMode = searchParams.get('view') === 'faculty' || cookieRole === 'coordinator';
 
   const [item, setItem] = useState<SkillItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +49,27 @@ export default function GapDetailPage() {
       if (!itemId) return;
       setLoading(true);
       try {
+        // Access Control: If student visits analysis not belonging to them, redirect to their own
+        if (analysisId && analysisId !== 'default' && !isFacultyMode) {
+          const { data: an } = await supabase.from('analyses').select('user_id').eq('id', analysisId).single();
+          if (an?.user_id && session?.id && an.user_id !== session.id) {
+            const { data: myAn } = await supabase
+              .from('analyses')
+              .select('id')
+              .eq('user_id', session.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            if (myAn?.id) {
+              router.replace(`/analyses/${myAn.id}`);
+              return;
+            } else {
+              router.replace('/home');
+              return;
+            }
+          }
+        }
         const { data } = await supabase.from('analysis_items').select('*').eq('id', itemId).single();
         if (data) {
           setItem(data);
@@ -105,7 +140,7 @@ export default function GapDetailPage() {
           
           {/* Breadcrumb */}
           <nav className="flex items-center gap-2 text-xs font-mono text-on-surface-variant mb-6">
-            <Link href={`/analyses/${analysisId}`} className="hover:text-primary transition-colors">
+            <Link href={isFacultyMode ? `/analyses/${analysisId}?view=faculty` : `/analyses/${analysisId}`} className="hover:text-primary transition-colors">
               Skill Map
             </Link>
             <span>/</span>
@@ -151,10 +186,10 @@ export default function GapDetailPage() {
               </button>
 
               <Link
-                href={`/analyses/${analysisId}/mentor`}
+                href={isFacultyMode ? `/analyses/${analysisId}/mentor?view=faculty` : `/analyses/${analysisId}/mentor`}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-surface-variant text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors"
               >
-                <span>Discuss with TPC Mentor</span>
+                <span>{isFacultyMode ? 'Open Consultation Channel' : 'Discuss with TPC Mentor'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -230,7 +265,7 @@ export default function GapDetailPage() {
         </div>
       </main>
 
-      <MobileTabBar role="student" />
+      <MobileTabBar role={isFacultyMode ? 'coordinator' : 'student'} />
     </div>
   );
 }

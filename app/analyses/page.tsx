@@ -1,65 +1,73 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import EmptyState from '@/components/ui/EmptyState';
+import { createClient } from '@/lib/supabase/client';
+import { getSession } from '@/lib/auth';
 
-const SAMPLE_ANALYSES = [
-  {
-    id: 'jfd-01',
-    role: 'Junior Frontend Developer',
-    benchmark: 'Razorpay / Tier-1 Standard Rubric 2024',
-    matchScore: 72,
-    matchLabel: 'Needs stronger proof',
-    matchType: 'proof',
-    topGap: 'React state management',
-    verifiedSkillsCount: 6,
-    needsProofCount: 3,
-    date: '12 Oct, 2025',
-  },
-  {
-    id: 'ase-01',
-    role: 'Associate Software Engineer',
-    benchmark: 'TCS Digital / Infosys DSE Standard',
-    matchScore: 84,
-    matchLabel: 'Strong evidence',
-    matchType: 'strong',
-    topGap: 'Distributed caching & Redis',
-    verifiedSkillsCount: 8,
-    needsProofCount: 2,
-    date: '28 Sep, 2025',
-  },
-  {
-    id: 'react-01',
-    role: 'React Developer',
-    benchmark: 'Swiggy Frontend Core Rubric',
-    matchScore: 54,
-    matchLabel: 'Needs stronger proof',
-    matchType: 'proof',
-    topGap: 'Next.js SSR & Caching',
-    verifiedSkillsCount: 4,
-    needsProofCount: 5,
-    date: '15 Sep, 2025',
-  },
-  {
-    id: 'intern-01',
-    role: 'Frontend Engineering Intern',
-    benchmark: 'Cred Design Tech Foundation',
-    matchScore: 91,
-    matchLabel: 'Strong evidence',
-    matchType: 'strong',
-    topGap: 'TypeScript generics',
-    verifiedSkillsCount: 9,
-    needsProofCount: 1,
-    date: '02 Aug, 2025',
-  },
-];
+interface AnalysisRecord {
+  id: string;
+  role: string;
+  benchmark: string;
+  matchScore: number;
+  matchLabel: string;
+  matchType: 'strong' | 'proof' | 'gap';
+  topGap: string;
+  date: string;
+}
 
 export default function AnalysesListPage() {
-  const [analyses, setAnalyses] = useState(SAMPLE_ANALYSES);
+  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const supabase = createClient();
+  const session = getSession();
+
+  useEffect(() => {
+    async function loadUserAnalyses() {
+      setLoading(true);
+      try {
+        const userId = session?.id;
+        let query = supabase.from('analyses').select('*');
+
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const mapped: AnalysisRecord[] = data.map((a: any) => {
+            const score = a.readiness_score || 0;
+            const matchType = score >= 80 ? 'strong' : score >= 60 ? 'proof' : 'gap';
+            const matchLabel = score >= 80 ? 'Strong match' : score >= 60 ? 'Needs stronger proof' : 'Critical gaps';
+            return {
+              id: a.id,
+              role: a.dream_role || 'Software Engineer',
+              benchmark: a.dream_company || 'Placement Benchmark Standard',
+              matchScore: score,
+              matchLabel,
+              matchType,
+              topGap: a.top_gap || 'System Architecture & Unit Tests',
+              date: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent',
+            };
+          });
+          setAnalyses(mapped);
+        } else {
+          setAnalyses([]);
+        }
+      } catch (err) {
+        console.warn('Error loading analyses:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUserAnalyses();
+  }, [session?.id, supabase]);
 
   const filteredAnalyses = analyses.filter((a) =>
     a.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -85,7 +93,7 @@ export default function AnalysesListPage() {
                 <span className="text-primary font-semibold">My Diagnostic Analyses</span>
               </div>
               <h1 className="font-headline text-2xl sm:text-3xl text-primary font-semibold tracking-tight">
-                Historical Diagnostic Analyses
+                My Diagnostic Analyses
               </h1>
               <p className="font-body text-xs sm:text-sm text-on-surface-variant mt-0.5">
                 Review past resume appraisals, calibrated benchmarks, and competency scores.
@@ -94,14 +102,20 @@ export default function AnalysesListPage() {
 
             <Link
               href="/analyses/new"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm self-start sm:self-auto"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>New analysis</span>
             </Link>
           </div>
 
-          {analyses.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-48 rounded-2xl bg-surface-container-low animate-pulse"></div>
+              ))}
+            </div>
+          ) : analyses.length === 0 ? (
             <EmptyState
               title="No diagnostic analyses found"
               description="Upload your resume to compare your project portfolio against real placement benchmarks."
@@ -137,7 +151,9 @@ export default function AnalysesListPage() {
                           className={`font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${
                             item.matchType === 'strong'
                               ? 'bg-[#E8F0EA] text-[#4F7A5A]'
-                              : 'bg-[#F7EEDB] text-[#B7832F]'
+                              : item.matchType === 'proof'
+                              ? 'bg-[#F7EEDB] text-[#B7832F]'
+                              : 'bg-[#FFDAD6] text-error'
                           }`}
                         >
                           {item.matchLabel} ({item.matchScore}%)
@@ -155,25 +171,21 @@ export default function AnalysesListPage() {
                       <div className="p-3 rounded-xl bg-surface-container-low border border-surface-variant/60 text-xs space-y-1 mb-4">
                         <div className="flex justify-between text-on-surface font-medium">
                           <span>Primary Skill Deficit:</span>
-                          <span className="text-secondary font-semibold">{item.topGap}</span>
-                        </div>
-                        <div className="flex justify-between text-on-surface-variant text-[11px] font-mono">
-                          <span>Verified: {item.verifiedSkillsCount} skills</span>
-                          <span>Needs Proof: {item.needsProofCount} skills</span>
+                          <span className="text-secondary font-semibold truncate max-w-[200px] text-right">{item.topGap}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="pt-3 border-t border-surface-container flex items-center justify-between text-xs">
                       <Link
-                        href={`/analyses/default/roadmap`}
+                        href={`/analyses/${item.id}/roadmap`}
                         className="text-on-surface-variant hover:text-primary font-medium"
                       >
                         Action roadmap →
                       </Link>
 
                       <Link
-                        href={`/analyses/default`}
+                        href={`/analyses/${item.id}`}
                         className="inline-flex items-center gap-1 text-primary font-semibold hover:underline"
                       >
                         <span>View report</span>

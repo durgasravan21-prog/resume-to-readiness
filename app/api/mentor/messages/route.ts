@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const analysisId = searchParams.get('analysisId');
+    const studentUserIdParam = searchParams.get('userId');
     const all = searchParams.get('all');
 
     const supabase = await getSupabase();
@@ -38,29 +39,69 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ messages: messages || [], chatStatus: 'open' });
     }
 
-    const { data: messages, error } = await supabase
-      .from('mentor_messages')
-      .select('*')
-      .eq('analysis_id', analysisId)
-      .order('created_at', { ascending: true });
+    // Determine target student identity & related analysis IDs to unify chat history
+    let studentUserId = studentUserIdParam || '';
+    const relatedAnalysisIds = [analysisId];
+
+    const { data: currentAnalysis } = await supabase
+      .from('analyses')
+      .select('user_id')
+      .eq('id', analysisId)
+      .single();
+
+    if (currentAnalysis?.user_id) {
+      studentUserId = currentAnalysis.user_id;
+    }
+
+    if (studentUserId) {
+      const { data: userAnalyses } = await supabase
+        .from('analyses')
+        .select('id')
+        .eq('user_id', studentUserId);
+
+      if (userAnalyses && userAnalyses.length > 0) {
+        userAnalyses.forEach((a: any) => {
+          if (!relatedAnalysisIds.includes(a.id)) relatedAnalysisIds.push(a.id);
+        });
+      }
+
+      // Consolidate legacy / demo threads for Durga
+      if (studentUserId === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee') {
+        if (!relatedAnalysisIds.includes('ans_7s4yk27')) relatedAnalysisIds.push('ans_7s4yk27');
+        if (!relatedAnalysisIds.includes('ans_durga_01')) relatedAnalysisIds.push('ans_durga_01');
+        if (!relatedAnalysisIds.includes('default')) relatedAnalysisIds.push('default');
+      }
+    }
+
+    // Query messages across all relevant threads
+    let query = supabase.from('mentor_messages').select('*');
+    if (studentUserId) {
+      query = query.or(`analysis_id.in.(${relatedAnalysisIds.join(',')}),user_id.eq.${studentUserId}`);
+    } else {
+      query = query.in('analysis_id', relatedAnalysisIds);
+    }
+
+    const { data: messages, error } = await query.order('created_at', { ascending: true });
 
     if (error) {
       console.warn('Could not fetch mentor messages:', error);
       return NextResponse.json({ messages: [], chatStatus: 'open' });
     }
 
-    const allMessages = messages || [];
+    const rawMessages = messages || [];
+    // Deduplicate by id if returned multiple times via OR filter
+    const uniqueMessages = Array.from(new Map(rawMessages.map((m: any) => [m.id, m])).values());
 
     // Chat is unlocked if any real mentor has replied (ignoring automated wait messages)
-    const hasMentorReply = allMessages.some(
+    const hasMentorReply = uniqueMessages.some(
       (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
     );
-    const hasStudentMessage = allMessages.some((m: any) => m.sender === 'student');
+    const hasStudentMessage = uniqueMessages.some((m: any) => m.sender === 'student');
 
     // Only waiting if student initiated and mentor hasn't replied yet
     const chatStatus = (hasStudentMessage && !hasMentorReply) ? 'waiting_for_mentor' : 'open';
 
-    return NextResponse.json({ messages: allMessages, chatStatus });
+    return NextResponse.json({ messages: uniqueMessages, chatStatus });
   } catch (err: any) {
     return NextResponse.json({ messages: [], chatStatus: 'open' });
   }
@@ -77,15 +118,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = await getSupabase();
 
-    // Check existing messages in this thread
+    // Check existing messages in this thread or for this student
+    let hasMentorReply = false;
     const { data: existingMessages } = await supabase
       .from('mentor_messages')
       .select('sender, message_text')
-      .eq('analysis_id', analysisId)
+      .or(`analysis_id.eq.${analysisId},user_id.eq.${userId || 'none'}`)
       .order('created_at', { ascending: true });
 
     const msgs = existingMessages || [];
-    const hasMentorReply = msgs.some(
+    hasMentorReply = msgs.some(
       (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
     );
 
@@ -117,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     // If sent by student
     if (isStudent) {
-      // If mentor has already joined and sent a message, KEEP CHAT OPEN and do NOT insert waiting message
+      // If mentor has already replied in this conversation or to this candidate, KEEP CHAT OPEN and do NOT insert waiting message
       if (hasMentorReply) {
         return NextResponse.json({
           success: true,
@@ -126,7 +168,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Initial inquiry: insert polite system acknowledgment
+      // Initial inquiry only: insert polite system acknowledgment
       const ackId = 'msg_sys_' + Math.random().toString(36).substring(2, 9);
       const ackMessage = {
         id: ackId,
@@ -154,7 +196,7 @@ export async function POST(request: NextRequest) {
       chatStatus: 'open',
     });
   } catch (err: any) {
-    console.error('Mentor messages POST error:', err);
+    console.error('Error in mentor messages route:', err);
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
   }
 }

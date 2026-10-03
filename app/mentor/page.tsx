@@ -83,6 +83,7 @@ export default function MentorConsolePage() {
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   // Load faculty mentors directly from database profiles
   const loadMentors = useCallback(async () => {
@@ -131,8 +132,10 @@ export default function MentorConsolePage() {
     }
   }, [supabase]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!hasLoadedRef.current && !silent) {
+      setLoading(true);
+    }
     try {
       const [profilesRes, analysesRes, assignmentsRes, messagesRes] = await Promise.all([
         supabase.from('profiles').select('*'),
@@ -220,7 +223,7 @@ export default function MentorConsolePage() {
         candidates.push({
           id: stProfile.id,
           name: stProfile.name || 'Candidate',
-          rollNumber: stProfile.roll_number || '4NI21CS' + Math.floor(10 + Math.random() * 89),
+          rollNumber: stProfile.roll_number || ('4NI21CS' + (stProfile.id.slice(-2).replace(/[^0-9]/g, '42') || '01')),
           branch: stProfile.branch || 'Computer Science & Engineering',
           cgpa: stProfile.cgpa || '8.2',
           targetRole: latestAnalysis?.dream_role || 'Software Development Engineer',
@@ -250,9 +253,10 @@ export default function MentorConsolePage() {
     } catch (e) {
       console.warn('Error loading mentor data:', e);
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
     }
-  }, [availableMentors, selectedStudentForChat, supabase]);
+  }, [availableMentors, supabase]);
 
   useEffect(() => {
     loadMentors();
@@ -276,12 +280,14 @@ export default function MentorConsolePage() {
           table: 'mentor_messages',
         },
         () => {
-          loadData();
+          loadData(true);
         }
       )
       .subscribe();
 
-    const interval = setInterval(loadData, 4000);
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 4000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -340,7 +346,7 @@ export default function MentorConsolePage() {
       setToastMessage(`Response dispatched as ${currentActiveMentor.name} to ${selectedStudentForReply.name}. Student chat unlocked.`);
       setReplyModalOpen(false);
       setReplyText('');
-      loadData();
+      loadData(true);
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
       alert(err.message || 'Error sending reply');
@@ -376,7 +382,7 @@ export default function MentorConsolePage() {
 
       setToastMessage(`Reply sent as ${currentActiveMentor.name} to ${selectedStudentForChat.name}. Student chat unlocked.`);
       setInboxReplyText('');
-      loadData();
+      loadData(true);
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err: any) {
       alert(err.message || 'Error sending reply');
@@ -717,7 +723,14 @@ export default function MentorConsolePage() {
                 <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
                   {displayedStudents.map((st) => {
                     const isSelected = selectedStudentForChat?.id === st.id;
-                    const stMsgs = allMessages.filter((m) => m.analysis_id === st.analysisId);
+                    const stMsgs = allMessages.filter((m) => {
+                      if (m.analysis_id === st.analysisId) return true;
+                      if (m.user_id === st.id) return true;
+                      if (st.id === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee') {
+                        return m.analysis_id === 'ans_7s4yk27' || m.analysis_id === 'ans_durga_01' || m.analysis_id === 'default';
+                      }
+                      return false;
+                    });
                     const lastMsg = stMsgs[0];
 
                     return (

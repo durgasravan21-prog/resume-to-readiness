@@ -40,16 +40,65 @@ export default function SkillMapPage() {
   const supabase = createClient();
   const session = getSession();
 
-  const isFacultyMode = searchParams.get('view') === 'faculty' ||
-    (session?.role as string) === 'coordinator' ||
-    (session?.role as string) === 'admin' ||
-    (session?.role as string) === 'mentor';
+  // Read role cookie to respect TopNav persona toggle
+  const [cookieRole, setCookieRole] = useState<string>('student');
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/readiness_role=([^;]+)/);
+      if (match) setCookieRole(match[1]);
+    }
+  }, []);
+
+  // Faculty mode is enabled if explicitly requested in URL or current session is coordinator
+  const isFacultyMode = searchParams.get('view') === 'faculty' || cookieRole === 'coordinator';
 
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [candidateProfile, setCandidateProfile] = useState<{ name: string; roll: string; branch: string } | null>(null);
   const [skillItems, setSkillItems] = useState<SkillItem[]>([]);
   const [activeDrawerSkill, setActiveDrawerSkill] = useState<SkillItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
+  const [adjustmentToast, setAdjustmentToast] = useState<string | null>(null);
+
+  const handleAdjustSkill = async (itemId: string, newStatus: 'strong' | 'proof' | 'missing', e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!isFacultyMode) return;
+
+    setAdjustingId(itemId);
+    const newLabel = newStatus === 'strong' ? 'Strong Evidence' : newStatus === 'proof' ? 'Needs Stronger Proof' : 'Missing Proofs';
+
+    // Optimistically update UI
+    setSkillItems((prev) =>
+      prev.map((s) => (s.id === itemId ? { ...s, status: newStatus, status_label: newLabel } : s))
+    );
+    if (activeDrawerSkill && activeDrawerSkill.id === itemId) {
+      setActiveDrawerSkill({ ...activeDrawerSkill, status: newStatus, status_label: newLabel });
+    }
+
+    try {
+      const res = await fetch('/api/analyses/items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId,
+          analysisId: analysis?.id || analysisId,
+          status: newStatus,
+          statusLabel: newLabel,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.newReadinessScore) {
+        setAnalysis((prev) => prev ? { ...prev, readiness_score: data.newReadinessScore } : null);
+      }
+      setAdjustmentToast(`Competency adjusted by Faculty. Readiness index updated to ${data.newReadinessScore ?? analysis?.readiness_score}/100.`);
+      setTimeout(() => setAdjustmentToast(null), 3500);
+    } catch (err) {
+      console.error('Error adjusting skill:', err);
+    } finally {
+      setAdjustingId(null);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -57,6 +106,22 @@ export default function SkillMapPage() {
       setLoading(true);
       
       try {
+        // Access Control: If student visits 'default', find their latest analysis and navigate there
+        if (analysisId === 'default' && session?.id && !isFacultyMode) {
+          const { data: myAn } = await supabase
+            .from('analyses')
+            .select('id')
+            .eq('user_id', session.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (myAn?.id && myAn.id !== 'default') {
+            router.replace(`/analyses/${myAn.id}`);
+            return;
+          }
+        }
+
         const [analysisRes, itemsRes] = await Promise.all([
           supabase.from('analyses').select('*').eq('id', analysisId).single(),
           supabase.from('analysis_items').select('*').eq('analysis_id', analysisId)
@@ -81,6 +146,25 @@ export default function SkillMapPage() {
               .select('*')
               .eq('analysis_id', latestAnalysis.id);
             itData = fallbackItems || [];
+          }
+        }
+
+        // Student Access Restriction: A student CANNOT view another student's progress or skill gaps
+        if (anData?.user_id && session?.id && anData.user_id !== session.id && !isFacultyMode) {
+          const { data: myAn } = await supabase
+            .from('analyses')
+            .select('id')
+            .eq('user_id', session.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (myAn?.id) {
+            router.replace(`/analyses/${myAn.id}`);
+            return;
+          } else {
+            router.replace('/home');
+            return;
           }
         }
 
@@ -330,6 +414,46 @@ export default function SkillMapPage() {
                     <p className="font-mono text-[11px] text-outline mt-2 truncate">
                       {skill.source_ref}
                     </p>
+                    {isFacultyMode && (
+                      <div className="mt-3 pt-2.5 border-t border-surface-container flex items-center justify-between gap-1 text-[11px] font-mono" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-on-surface-variant text-[10px]">Adjust:</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'strong', e)}
+                            title="Mark as Strong Evidence"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'strong'
+                                ? 'bg-[#E8F0EA] text-[#4F7A5A] ring-1 ring-[#4F7A5A]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Strong
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'proof', e)}
+                            title="Mark as Needs Proof"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'proof' || skill.status === 'needs_proof'
+                                ? 'bg-[#F7EEDB] text-[#B7832F] ring-1 ring-[#B7832F]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Proof
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'missing', e)}
+                            title="Mark as Critical Gap"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'missing' || skill.status === 'gap'
+                                ? 'bg-[#FFDAD6] text-error ring-1 ring-error/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Gap
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -367,6 +491,46 @@ export default function SkillMapPage() {
                       <span>Click for evidence audit</span>
                       <span>→</span>
                     </div>
+                    {isFacultyMode && (
+                      <div className="mt-2.5 pt-2 border-t border-secondary/20 flex items-center justify-between gap-1 text-[11px] font-mono" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-on-surface-variant text-[10px]">Adjust:</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'strong', e)}
+                            title="Mark as Strong Evidence"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'strong'
+                                ? 'bg-[#E8F0EA] text-[#4F7A5A] ring-1 ring-[#4F7A5A]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Strong
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'proof', e)}
+                            title="Mark as Needs Proof"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'proof' || skill.status === 'needs_proof'
+                                ? 'bg-[#F7EEDB] text-[#B7832F] ring-1 ring-[#B7832F]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Proof
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'missing', e)}
+                            title="Mark as Critical Gap"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'missing' || skill.status === 'gap'
+                                ? 'bg-[#FFDAD6] text-error ring-1 ring-error/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Gap
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -400,6 +564,46 @@ export default function SkillMapPage() {
                     <p className="font-body text-xs text-on-surface-variant mt-2 line-clamp-2 leading-relaxed">
                       {skill.plain_explanation}
                     </p>
+                    {isFacultyMode && (
+                      <div className="mt-3 pt-2.5 border-t border-surface-container flex items-center justify-between gap-1 text-[11px] font-mono" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-on-surface-variant text-[10px]">Adjust:</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'strong', e)}
+                            title="Mark as Strong Evidence"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'strong'
+                                ? 'bg-[#E8F0EA] text-[#4F7A5A] ring-1 ring-[#4F7A5A]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Strong
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'proof', e)}
+                            title="Mark as Needs Proof"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'proof' || skill.status === 'needs_proof'
+                                ? 'bg-[#F7EEDB] text-[#B7832F] ring-1 ring-[#B7832F]/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Proof
+                          </button>
+                          <button
+                            onClick={(e) => handleAdjustSkill(skill.id, 'missing', e)}
+                            title="Mark as Critical Gap"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              skill.status === 'missing' || skill.status === 'gap'
+                                ? 'bg-[#FFDAD6] text-error ring-1 ring-error/50'
+                                : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            Gap
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -495,6 +699,48 @@ export default function SkillMapPage() {
                     {activeDrawerSkill.plain_explanation}
                   </div>
                 </div>
+
+                {/* Faculty Evaluation Override in Drawer */}
+                {isFacultyMode && (
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-mono font-semibold text-primary">Faculty Evaluation Override</span>
+                      <span className="text-[10px] font-mono text-on-surface-variant">Real-time Recalculation</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={(e) => handleAdjustSkill(activeDrawerSkill.id, 'strong', e)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-mono font-semibold text-center transition-colors cursor-pointer ${
+                          activeDrawerSkill.status === 'strong'
+                            ? 'bg-[#E8F0EA] text-[#4F7A5A] ring-1 ring-[#4F7A5A]'
+                            : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                        }`}
+                      >
+                        Strong Evidence
+                      </button>
+                      <button
+                        onClick={(e) => handleAdjustSkill(activeDrawerSkill.id, 'proof', e)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-mono font-semibold text-center transition-colors cursor-pointer ${
+                          activeDrawerSkill.status === 'proof' || activeDrawerSkill.status === 'needs_proof'
+                            ? 'bg-[#F7EEDB] text-[#B7832F] ring-1 ring-[#B7832F]'
+                            : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                        }`}
+                      >
+                        Needs Proof
+                      </button>
+                      <button
+                        onClick={(e) => handleAdjustSkill(activeDrawerSkill.id, 'missing', e)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-mono font-semibold text-center transition-colors cursor-pointer ${
+                          activeDrawerSkill.status === 'missing' || activeDrawerSkill.status === 'gap'
+                            ? 'bg-[#FFDAD6] text-error ring-1 ring-error'
+                            : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                        }`}
+                      >
+                        Skill Gap
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -509,6 +755,14 @@ export default function SkillMapPage() {
               </Link>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Adjustment Toast */}
+      {adjustmentToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-primary text-on-primary px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-fade-in border border-surface-variant font-mono text-xs">
+          <span className="w-2 h-2 rounded-full bg-secondary animate-pulse shrink-0"></span>
+          <span>{adjustmentToast}</span>
         </div>
       )}
 

@@ -34,7 +34,7 @@ export default function TopNav() {
     router.push('/');
   };
 
-  const isCoordinator = user?.role === 'coordinator' || pathname.startsWith('/tpc');
+  const isCoordinator = user?.role === 'coordinator' || pathname.startsWith('/tpc') || pathname.startsWith('/mentor');
 
   const handleToggleRole = () => {
     setMenuOpen(false);
@@ -58,7 +58,7 @@ export default function TopNav() {
     ? [
         { label: 'Overview', href: '/tpc' },
         { label: 'Students', href: '/tpc/students' },
-        { label: 'Roles', href: '/tpc/roles' },
+        { label: 'Mentorship', href: '/mentor' },
         { label: 'Reports', href: '/tpc/reports' },
         { label: 'Settings', href: '/tpc/settings' },
       ]

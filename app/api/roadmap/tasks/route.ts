@@ -91,3 +91,62 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Server error creating task.' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { taskId, title, description, isCompleted, suggestedByMentor, hoursEstimate } = body;
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'Missing taskId.' }, { status: 400 });
+    }
+
+    const supabase = await getSupabase();
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description.trim();
+    if (isCompleted !== undefined) updateData.is_completed = isCompleted;
+    if (suggestedByMentor !== undefined) updateData.suggested_by_mentor = suggestedByMentor;
+    if (hoursEstimate !== undefined) updateData.hours_estimate = hoursEstimate;
+
+    const { data, error } = await supabase
+      .from('roadmap_tasks')
+      .update(updateData)
+      .eq('id', taskId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, task: data });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error updating task.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const taskId = searchParams.get('taskId');
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'Missing taskId.' }, { status: 400 });
+    }
+
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from('roadmap_tasks')
+      .delete()
+      .eq('id', taskId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error deleting task.' }, { status: 500 });
+  }
+}

@@ -45,9 +45,17 @@ export default function MentorPage() {
   const supabase = createClient();
   const session = getSession();
 
-  // Check if viewing in faculty mode
-  const isFacultyRole = (session?.role as string) === 'coordinator' || (session?.role as string) === 'admin' || (session?.role as string) === 'mentor';
-  const isFacultyMode = isFacultyViewParam || isFacultyRole;
+  // Read role cookie to respect TopNav persona toggle
+  const [cookieRole, setCookieRole] = useState<string>('student');
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/readiness_role=([^;]+)/);
+      if (match) setCookieRole(match[1]);
+    }
+  }, []);
+
+  // Faculty mode is explicitly enabled by ?view=faculty or when user has switched to coordinator view
+  const isFacultyMode = isFacultyViewParam || (cookieRole === 'coordinator');
 
   const [analysisId, setAnalysisId] = useState<string>(rawAnalysisId);
   const [studentInfo, setStudentInfo] = useState<{ name: string; branch: string; roll: string } | null>(null);
@@ -62,7 +70,7 @@ export default function MentorPage() {
   // Resolve effective analysis ID if visiting 'default' as a logged-in student
   useEffect(() => {
     async function resolveAnalysis() {
-      if (rawAnalysisId === 'default' && session?.id && !isFacultyMode) {
+      if ((rawAnalysisId === 'default' || !rawAnalysisId) && session?.id && !isFacultyMode) {
         try {
           const { data } = await supabase
             .from('analyses')
@@ -83,7 +91,7 @@ export default function MentorPage() {
       setAnalysisId(rawAnalysisId);
     }
     resolveAnalysis();
-  }, [rawAnalysisId, session?.id, isFacultyMode]);
+  }, [rawAnalysisId, session?.id, isFacultyMode, supabase]);
 
   // Load student & assigned faculty details
   useEffect(() => {
@@ -126,12 +134,13 @@ export default function MentorPage() {
       }
     }
     if (analysisId) loadMetadata();
-  }, [analysisId]);
+  }, [analysisId, supabase]);
 
-  // Fetch messages from API
+  // Fetch messages from API with student user ID for cross-thread consolidation
   const fetchMessages = useCallback(async () => {
     try {
-      const res = await fetch(`/api/mentor/messages?analysisId=${analysisId}`);
+      const userIdParam = session?.id ? `&userId=${session.id}` : '';
+      const res = await fetch(`/api/mentor/messages?analysisId=${analysisId}${userIdParam}`);
       const data = await res.json();
       if (data.messages && data.messages.length > 0) {
         setMessages(data.messages);
@@ -142,36 +151,23 @@ export default function MentorPage() {
     } catch (e) {
       console.warn('Could not fetch messages:', e);
     }
-  }, [analysisId]);
+  }, [analysisId, session?.id]);
 
   useEffect(() => {
     fetchMessages();
 
     // 1. Supabase Realtime channel subscription for instant two-way messaging
     const channel = supabase
-      .channel(`mentor_chat_${analysisId}`)
+      .channel(`mentor_chat_realtime_${analysisId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'mentor_messages',
-          filter: `analysis_id=eq.${analysisId}`,
         },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newMsg = payload.new as ChatMessage;
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
-            // If mentor sent a message, immediately open the chat
-            if (newMsg.sender === 'mentor') {
-              setChatStatus('open');
-            }
-          } else {
-            fetchMessages();
-          }
+        () => {
+          fetchMessages();
         }
       )
       .subscribe();
@@ -183,7 +179,7 @@ export default function MentorPage() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [analysisId, fetchMessages]);
+  }, [analysisId, fetchMessages, supabase]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -192,9 +188,6 @@ export default function MentorPage() {
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || inputValue.trim();
     if (!text || sending) return;
-
-    // Only block student when actively waiting for mentor
-    if (!isFacultyMode && chatStatus === 'waiting_for_mentor') return;
 
     setSending(true);
     if (!textToSend) setInputValue('');
@@ -230,11 +223,6 @@ export default function MentorPage() {
 
       const data = await res.json();
 
-      if (res.status === 429 && !isFacultyMode) {
-        setChatStatus('waiting_for_mentor');
-        return;
-      }
-
       if (data.chatStatus) {
         setChatStatus(data.chatStatus);
       }
@@ -244,7 +232,7 @@ export default function MentorPage() {
         setChatStatus('open');
       }
 
-      setTimeout(fetchMessages, 600);
+      setTimeout(fetchMessages, 400);
     } catch (err) {
       console.error('Network error sending message:', err);
     } finally {
@@ -425,44 +413,45 @@ export default function MentorPage() {
             </div>
           )}
 
-          {/* Chat Input Bar */}
-          {!isFacultyMode && chatStatus === 'waiting_for_mentor' ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-high border border-outline-variant/30 text-on-surface-variant">
+          {/* Status Banner when awaiting initial mentor response */}
+          {!isFacultyMode && chatStatus === 'waiting_for_mentor' && (
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-surface-container-high border border-secondary/30 text-on-surface-variant mb-2">
               <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse shrink-0"></span>
               <p className="text-xs font-body">
-                Messaging is paused until the faculty mentor responds. You will be able to continue once the mentor replies to your query.
+                Initial query logged. Your assigned faculty mentor will join shortly. You can add additional questions or project details below.
               </p>
             </div>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex gap-2"
-            >
-              <input
-                type="text"
-                placeholder={
-                  isFacultyMode
-                    ? `Reply as ${session?.name || mentorName} (Placement Faculty)...`
-                    : 'Ask your mentor about specific skill gaps, project architectures, or campus rounds...'
-                }
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl border border-surface-variant bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:border-primary font-body"
-              />
-              <button
-                type="submit"
-                disabled={sending || !inputValue.trim()}
-                className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                {sending && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
-                <span>{isFacultyMode ? 'Send Reply' : 'Send Message'}</span>
-                <span className="material-symbols-outlined text-[16px]">send</span>
-              </button>
-            </form>
           )}
+
+          {/* Chat Input Bar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            className="flex gap-2"
+          >
+            <input
+              type="text"
+              placeholder={
+                isFacultyMode
+                  ? `Reply as ${session?.name || mentorName} (Placement Faculty)...`
+                  : 'Ask your mentor about specific skill gaps, project architectures, or campus rounds...'
+              }
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="flex-1 px-4 py-3 rounded-xl border border-surface-variant bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:border-primary font-body"
+            />
+            <button
+              type="submit"
+              disabled={sending || !inputValue.trim()}
+              className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
+            >
+              {sending && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
+              <span>{isFacultyMode ? 'Send Reply' : 'Send Message'}</span>
+              <span className="material-symbols-outlined text-[16px]">send</span>
+            </button>
+          </form>
         </div>
       </main>
 

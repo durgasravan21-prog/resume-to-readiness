@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import { createClient } from '@/lib/supabase/client';
 import { getSession } from '@/lib/auth';
-import { Check, MessageSquare, Zap, CalendarDays } from 'lucide-react';
+import { Check, MessageSquare, Zap, CalendarDays, Trash2 } from 'lucide-react';
 
 interface RoadmapTask {
   id: string;
@@ -27,16 +27,23 @@ interface RoadmapItem {
 }
 
 export default function RoadmapPage() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const analysisId = params?.id as string;
   const supabase = createClient();
   const session = getSession();
 
-  const isFacultyMode = searchParams.get('view') === 'faculty' ||
-    (session?.role as string) === 'coordinator' ||
-    (session?.role as string) === 'admin' ||
-    (session?.role as string) === 'mentor';
+  // Read role cookie to respect TopNav persona toggle
+  const [cookieRole, setCookieRole] = useState<string>('student');
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/readiness_role=([^;]+)/);
+      if (match) setCookieRole(match[1]);
+    }
+  }, []);
+
+  const isFacultyMode = searchParams.get('view') === 'faculty' || cookieRole === 'coordinator';
 
   const [tasks, setTasks] = useState<RoadmapTask[]>([]);
   const [items, setItems] = useState<RoadmapItem[]>([]);
@@ -52,16 +59,70 @@ export default function RoadmapPage() {
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isFacultyMode) return;
+    if (!confirm('Are you sure you want to remove this roadmap task?')) return;
+
+    try {
+      const res = await fetch(`/api/roadmap/tasks?taskId=${taskId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete task');
+
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setToastMsg('Task removed from roadmap by Faculty Mentor.');
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err) {
+      console.error('Delete task error:', err);
+    }
+  };
+
   const loadData = async () => {
     if (!analysisId) return;
     setLoading(true);
 
     try {
+      // Access Control: If student visits 'default', find their latest analysis and navigate there
+      if (analysisId === 'default' && session?.id && !isFacultyMode) {
+        const { data: myAn } = await supabase
+          .from('analyses')
+          .select('id')
+          .eq('user_id', session.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (myAn?.id && myAn.id !== 'default') {
+          router.replace(`/analyses/${myAn.id}/roadmap`);
+          return;
+        }
+      }
+
       const [tasksRes, itemsRes, analysisRes] = await Promise.all([
         supabase.from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('order_index', { ascending: true }),
         supabase.from('roadmap_items').select('*').eq('analysis_id', analysisId),
         supabase.from('analyses').select('user_id, dream_role').eq('id', analysisId).single(),
       ]);
+
+      // Student Access Restriction: A student CANNOT view another student's progress or roadmap
+      if (analysisRes.data?.user_id && session?.id && analysisRes.data.user_id !== session.id && !isFacultyMode) {
+        const { data: myAn } = await supabase
+          .from('analyses')
+          .select('id')
+          .eq('user_id', session.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (myAn?.id) {
+          router.replace(`/analyses/${myAn.id}/roadmap`);
+          return;
+        } else {
+          router.replace('/home');
+          return;
+        }
+      }
 
       let loadedTasks = tasksRes.data || [];
       if (loadedTasks.length === 0) {
@@ -340,11 +401,22 @@ export default function RoadmapPage() {
                           <h3 className={`text-xs sm:text-sm font-semibold ${task.is_completed ? 'line-through text-outline' : 'text-on-surface'}`}>
                             {task.title}
                           </h3>
-                          {(task as any).suggested_by_mentor && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary-fixed/20 text-secondary font-semibold border border-secondary/30 shrink-0">
-                              Prescribed by Mentor
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {(task as any).suggested_by_mentor && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary-fixed/20 text-secondary font-semibold border border-secondary/30 shrink-0">
+                                Prescribed by Mentor
+                              </span>
+                            )}
+                            {isFacultyMode && (
+                              <button
+                                onClick={(e) => handleDeleteTask(task.id, e)}
+                                title="Remove task from candidate roadmap"
+                                className="p-1 rounded hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors shrink-0 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className={`font-body text-xs mt-1 leading-relaxed ${task.is_completed ? 'text-outline' : 'text-on-surface-variant'}`}>
                           {task.description}
