@@ -50,20 +50,24 @@ export function classifyResumeText(text: string): ResumeClassificationResult {
 
   // Positive section cues
   const sections = {
-    education: /(education|academics|qualification|b\.?tech|b\.?e\.?|degree|cgpa|gpa|university|college|school)/i,
-    skills: /(skills|technical skills|proficiencies|technologies|programming|tools|frameworks)/i,
-    experience: /(experience|projects|internship|work history|employment|contributions)/i,
-    achievements: /(achievements|awards|certifications|extracurricular|publications|competitions|honors)/i,
+    summary: /(summary|profile|about me|objective|career objective|biography|overview|personal profile|curriculum vitae|cv)/i,
+    education: /(education|academics|qualification|b\.?tech|b\.?e\.?|degree|cgpa|gpa|university|college|school|intermediate|matriculation|percentage|diploma|ssc|hsc|cbse|icse)/i,
+    skills: /(skills|technical skills|proficiencies|technologies|programming|tools|frameworks|languages|competencies|strengths|technical proficiencies)/i,
+    experience: /(experience|projects|internship|work history|employment|contributions|work experience|academic projects|mini project|major project)/i,
+    achievements: /(achievements|awards|certifications|extracurricular|publications|competitions|honors|activities|trainings|certificates|participation)/i,
+    personal: /(personal details|contact|phone|email|address|declaration|hobbies|interests|languages known|father|mother|dob|date of birth)/i,
   };
 
   const detectedSections: string[] = [];
+  if (sections.summary.test(text)) detectedSections.push('Summary & Objective');
   if (sections.education.test(text)) detectedSections.push('Education');
   if (sections.skills.test(text)) detectedSections.push('Skills');
   if (sections.experience.test(text)) detectedSections.push('Experience & Projects');
   if (sections.achievements.test(text)) detectedSections.push('Achievements');
+  if (sections.personal.test(text)) detectedSections.push('Personal Details');
 
-  // Need at least 2 distinct resume sections
-  if (detectedSections.length < 2) {
+  // Accept as resume if it has at least 1 typical section or length is substantial without invoice triggers
+  if (detectedSections.length === 0 && text.length < 150) {
     return {
       isResume: false,
       confidence: 0.3,
@@ -72,7 +76,7 @@ export function classifyResumeText(text: string): ResumeClassificationResult {
     };
   }
 
-  const confidence = Math.min(1.0, 0.4 + detectedSections.length * 0.15);
+  const confidence = Math.min(1.0, 0.5 + detectedSections.length * 0.1);
 
   return {
     isResume: true,

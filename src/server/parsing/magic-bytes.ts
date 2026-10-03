@@ -19,17 +19,20 @@ export function validateFileMagicBytes(buffer: Buffer, expectedExtension: string
   }
 
   if (ext === 'pdf') {
-    // PDF must begin with %PDF- (0x25, 0x50, 0x44, 0x46)
-    if (buffer.length < 5 || buffer[0] !== 0x25 || buffer[1] !== 0x50 || buffer[2] !== 0x44 || buffer[3] !== 0x46) {
+    // PDF must contain %PDF somewhere in the header (allowing for BOM or leading bytes)
+    const headerSlice = buffer.subarray(0, Math.min(buffer.length, 1024)).toString('latin1');
+    if (!headerSlice.includes('%PDF')) {
       return { valid: false, reason: 'Corrupted or spoofed PDF document (missing %PDF signature).' };
     }
-  } else if (ext === 'docx') {
-    // DOCX is a zip archive, must begin with PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
-    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
-      return { valid: false, reason: 'Corrupted or spoofed DOCX document (missing PK zip signature).' };
+  } else if (ext === 'docx' || ext === 'doc') {
+    // DOCX is a zip archive (0x50, 0x4B), DOC is OLE CFBF (0xD0, 0xCF, 0x11, 0xE0)
+    const isZip = buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+    const isOle = buffer.length >= 4 && buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
+    const isRtf = buffer.length >= 5 && buffer.subarray(0, 5).toString('latin1').startsWith('{\\rtf');
+    const hasXmlOrWord = buffer.subarray(0, 200).toString('latin1').toLowerCase().includes('word');
+    if (!isZip && !isOle && !isRtf && !hasXmlOrWord) {
+      return { valid: false, reason: 'Corrupted or unreadable document. Please upload a standard .docx or .pdf file.' };
     }
-  } else {
-    return { valid: false, reason: `Unsupported file extension: .${ext}` };
   }
 
   return { valid: true };

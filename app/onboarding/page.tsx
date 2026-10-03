@@ -158,16 +158,18 @@ export default function OnboardingPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to complete onboarding.');
+        throw new Error(data.error || `Server responded with ${res.status}: Failed to complete onboarding.`);
       }
 
       // Route directly to waiting analysis screen
       router.push(`/analyses/waiting/${data.analysisId}`);
     } catch (err: any) {
+      console.error('Onboarding submission notice:', err);
       setErrorMessage(err.message || 'Error completing onboarding. Please retry.');
       setSubmitting(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -770,6 +772,13 @@ export default function OnboardingPage() {
                 </div>
               </label>
             </div>
+
+            {errorMessage && (
+              <div className="p-4 rounded-xl bg-error-container/20 border border-error/30 text-error text-xs font-body flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-4 border-t border-surface-container-highest">
               <button

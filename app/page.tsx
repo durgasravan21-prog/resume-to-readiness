@@ -19,7 +19,7 @@ export default function WelcomePage() {
   const supabase = createClient();
 
   // Auth flow states
-  const [authStep, setAuthStep] = useState<'input' | 'otp'>('input');
+  const [authStep, setAuthStep] = useState<'input' | 'sent'>('input');
   const [emailInput, setEmailInput] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +27,7 @@ export default function WelcomePage() {
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
 
-  // Countdown timer for OTP resend
+  // Countdown timer for resend
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (countdown > 0) {
@@ -54,7 +54,7 @@ export default function WelcomePage() {
     }
   };
 
-  // Send Email OTP Handler
+  // Send Email Sign-in Link / OTP Handler
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanEmail = emailInput.trim().toLowerCase();
@@ -68,20 +68,22 @@ export default function WelcomePage() {
     setInfoMessage(null);
 
     try {
+      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '';
       const { error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {
           shouldCreateUser: true,
+          emailRedirectTo: redirectUrl,
         },
       });
 
       if (error) throw error;
 
-      setAuthStep('otp');
+      setAuthStep('sent');
       setCountdown(60);
-      setInfoMessage(`A 6-digit login code has been sent to ${cleanEmail}.`);
+      setInfoMessage(`A sign-in link has been sent to ${cleanEmail}. Click the link in your email to proceed.`);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Could not send verification code. Please check your email or use demo bypass.');
+      setErrorMessage(err.message || 'Could not send verification email. Please check your email or use demo bypass.');
     } finally {
       setLoading(false);
     }
@@ -324,46 +326,62 @@ export default function WelcomePage() {
                   </form>
                 </div>
               ) : (
-                /* Step 2: 6-Digit OTP Verification Screen */
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                      Enter 6-Digit Verification Code
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      autoFocus
-                      required
-                      placeholder="123456"
-                      value={otpInput}
-                      onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-full text-center tracking-[0.5em] text-xl font-mono py-3 px-4 rounded-xl border border-surface-container-highest bg-surface-container-low text-primary focus:outline-none focus:border-primary font-semibold"
-                    />
+                /* Step 2: Magic Link Sent + Code Fallback Screen */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-primary-container/10 border border-primary/20 text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-headline font-semibold text-sm text-primary">
+                      Check your email inbox
+                    </h3>
+                    <p className="font-body text-xs text-on-surface-variant leading-relaxed">
+                      We sent a secure sign-in link to <span className="font-mono font-bold text-primary">{emailInput}</span>. Click the link in your email to authenticate immediately.
+                    </p>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || otpInput.trim().length !== 6}
-                    className="w-full py-3 px-4 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-semibold text-sm transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Verify & Continue</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
+                  {/* Fallback code input if email contains 6-digit OTP */}
+                  <form onSubmit={handleVerifyOtp} className="space-y-3 pt-1">
+                    <div className="text-center">
+                      <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1.5">
+                        Received a 6-digit code instead?
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="123456"
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                        className="w-full text-center tracking-[0.5em] text-lg font-mono py-2.5 px-4 rounded-xl border border-surface-container-highest bg-surface-container-low text-primary focus:outline-none focus:border-primary font-semibold"
+                      />
+                    </div>
 
-                  <div className="flex items-center justify-between text-xs font-mono pt-1">
+                    {otpInput.trim().length === 6 && (
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-2.5 px-4 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <span>Verify Code</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </form>
+
+                  <div className="flex items-center justify-between text-xs font-mono pt-2 border-t border-surface-container-highest">
                     <button
                       type="button"
                       onClick={() => {
                         setAuthStep('input');
                         setOtpInput('');
                         setErrorMessage(null);
+                        setInfoMessage(null);
                       }}
                       className="text-on-surface-variant hover:text-primary transition-colors"
                     >
@@ -378,11 +396,11 @@ export default function WelcomePage() {
                         onClick={handleSendOtp}
                         className="text-secondary font-semibold hover:underline"
                       >
-                        Resend Code
+                        Resend Link
                       </button>
                     )}
                   </div>
-                </form>
+                </div>
               )}
 
               {/* Evaluator Quick Access (Local & Demo Mode) */}
