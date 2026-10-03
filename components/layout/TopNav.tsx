@@ -59,6 +59,7 @@ export default function TopNav() {
         { label: 'Overview', href: '/tpc' },
         { label: 'Students', href: '/tpc/students' },
         { label: 'Roles', href: '/tpc/roles' },
+        { label: 'Mentorship', href: '/mentor' },
         { label: 'Reports', href: '/tpc/reports' },
         { label: 'Settings', href: '/tpc/settings' },
       ]
@@ -94,27 +95,28 @@ export default function TopNav() {
           )}
         </div>
 
-        {/* Center Nav Links (Student) */}
-        {!isCoordinator && (
-          <nav className="hidden md:flex items-center gap-6 h-full">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href || (link.href !== '/home' && pathname.startsWith(link.href));
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`h-full flex items-center transition-colors text-sm font-medium border-b-2 pt-0.5 ${
-                    isActive
-                      ? 'border-primary text-primary font-semibold'
-                      : 'border-transparent text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
+        {/* Center Nav Links */}
+        <nav className="hidden md:flex items-center gap-6 h-full">
+          {navLinks.map((link) => {
+            const isActive =
+              link.href === '/home' || link.href === '/tpc'
+                ? pathname === link.href
+                : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`h-full flex items-center transition-colors text-sm font-medium border-b-2 pt-0.5 ${
+                  isActive
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
 
         {/* User Profile & Avatar Menu */}
         <div className="flex items-center gap-3">

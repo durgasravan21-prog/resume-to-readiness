@@ -95,11 +95,11 @@ export default function NewAnalysisPage() {
   const processFile = (file: File) => {
     setFileError(null);
     setApiError(null);
-    const validExtensions = ['.pdf', '.docx'];
+    const validExtensions = ['.pdf', '.docx', '.doc'];
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     
     if (!validExtensions.includes(ext)) {
-      setFileError('Invalid file format. Please upload a PDF or DOCX document.');
+      setFileError('Invalid file format. Please upload a PDF or Word document (.docx, .doc).');
       return;
     }
 
@@ -306,7 +306,7 @@ export default function NewAnalysisPage() {
                     <input
                       type="file"
                       id="resume-upload-input"
-                      accept=".pdf,.docx"
+                      accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
                       onChange={handleFileInput}
                       className="hidden"
                     />

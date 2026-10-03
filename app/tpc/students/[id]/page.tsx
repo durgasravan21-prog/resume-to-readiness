@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileTabBar from '@/components/layout/MobileTabBar';
+import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 
 interface CoachingNote {
   id: string;
@@ -13,6 +15,70 @@ interface CoachingNote {
   timestamp: string;
   text: string;
 }
+
+interface CompetencyItem {
+  id: string;
+  name: string;
+  status: 'strong' | 'needs_proof' | 'missing';
+  status_label?: string;
+  jd_requirement?: string;
+  evidence_quote?: string;
+  plain_explanation?: string;
+}
+
+const FALLBACK_CANDIDATE: Record<string, any> = {
+  '36ac8503-c1c5-4865-b3f5-51c302a3e1ee': {
+    name: 'Durga sravan Challagolla',
+    rollNumber: '2021BCS0089',
+    branch: 'Computer Science & Engineering',
+    degree: 'B.Tech',
+    cgpa: '8.45',
+    targetRole: 'Junior Frontend Developer',
+    targetCompany: 'Razorpay',
+    readinessScore: 78,
+    school10th: 'Delhi Public School (CBSE)',
+    school10thMarks: '94.2%',
+    school12th: 'Narayana PU College (State Board)',
+    school12thMarks: '96.5%',
+    achievements: '• Smart India Hackathon Finalist\n• Solved 350+ problems on LeetCode\n• Open source contributor to React libraries',
+    resumeFileName: 'durga_sravan_resume.pdf',
+    resumeFileSize: '142 KB',
+  },
+  usr_ananya: {
+    name: 'Ananya Reddy',
+    rollNumber: '2021BCS0089',
+    branch: 'Computer Science & Engineering',
+    degree: 'B.Tech',
+    cgpa: '8.74',
+    targetRole: 'Junior Frontend Developer',
+    targetCompany: 'Razorpay',
+    readinessScore: 72,
+    school10th: 'DPS Bangalore (CBSE)',
+    school10thMarks: '95.0%',
+    school12th: 'Christ Junior College (State Board)',
+    school12thMarks: '96.2%',
+    achievements: '• Lead Organizer, IEEE NIE Student Branch\n• Built Campus Connect full stack portal\n• Google Summer of Code 2024 Contributor',
+    resumeFileName: 'ananya_reddy_resume.pdf',
+    resumeFileSize: '156 KB',
+  },
+  usr_aarav_01: {
+    name: 'Aarav Sundaram',
+    rollNumber: '4NI21EC042',
+    branch: 'Electronics & Communication',
+    degree: 'B.Tech',
+    cgpa: '8.45',
+    targetRole: 'Embedded Systems Engineer',
+    targetCompany: 'Qualcomm',
+    readinessScore: 74,
+    school10th: 'Delhi Public School, Bangalore (CBSE)',
+    school10thMarks: '94.2%',
+    school12th: 'National PU College, Bangalore (State Board)',
+    school12thMarks: '96.0%',
+    achievements: '• Smart India Hackathon 2024 Finalist (Team Lead)\n• Solved 350+ problems on LeetCode (Contest Rating: 1740)\n• Open source contributor to FreeRTOS ESP32 drivers',
+    resumeFileName: 'aarav_sundaram_resume.pdf',
+    resumeFileSize: '142 KB',
+  },
+};
 
 const INITIAL_NOTES: CoachingNote[] = [
   {
@@ -31,12 +97,19 @@ const INITIAL_NOTES: CoachingNote[] = [
 
 export default function StudentCoachingDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const studentId = (params?.id as string) || 'usr_aarav_01';
 
+  // Candidate Data State
+  const [candidate, setCandidate] = useState<any>(FALLBACK_CANDIDATE[studentId] || FALLBACK_CANDIDATE['usr_aarav_01']);
+  const [analysisId, setAnalysisId] = useState<string>('default');
+  const [competencies, setCompetencies] = useState<CompetencyItem[]>([]);
+  const [roadmapTasks, setRoadmapTasks] = useState<any[]>([]);
   const [notes, setNotes] = useState<CoachingNote[]>(INITIAL_NOTES);
   const [newNoteText, setNewNoteText] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'roadmap' | 'academics' | 'flags' | 'notes'>('diagnosis');
+  const [loading, setLoading] = useState(true);
 
   // Chance & Flag state
   const [flagCount, setFlagCount] = useState(1);
@@ -47,18 +120,151 @@ export default function StudentCoachingDetailPage() {
   const [grantingChance, setGrantingChance] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleSaveNote = () => {
+  // Fetch candidate profile, analysis, and notes from Supabase
+  useEffect(() => {
+    async function fetchCandidateData() {
+      try {
+        const supabase = createClient();
+
+        // 1. Fetch profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`id.eq.${studentId},email.eq.${studentId}`)
+          .single();
+
+        // 2. Fetch analysis
+        const { data: analyses } = await supabase
+          .from('analyses')
+          .select('*')
+          .or(`user_id.eq.${studentId},id.eq.${studentId}`)
+          .order('created_at', { ascending: false });
+
+        const latestAnalysis = analyses && analyses.length > 0 ? analyses[0] : null;
+        if (latestAnalysis) {
+          setAnalysisId(latestAnalysis.id);
+
+          // 3. Fetch analysis items (competencies)
+          const { data: items } = await supabase
+            .from('analysis_items')
+            .select('*')
+            .eq('analysis_id', latestAnalysis.id)
+            .order('created_at', { ascending: true });
+
+          if (items && items.length > 0) {
+            setCompetencies(items);
+          }
+
+          // 4. Fetch roadmap tasks
+          const { data: tasks } = await supabase
+            .from('roadmap_tasks')
+            .select('*')
+            .eq('analysis_id', latestAnalysis.id)
+            .order('created_at', { ascending: true });
+
+          if (tasks && tasks.length > 0) {
+            setRoadmapTasks(tasks);
+          }
+        }
+
+        // 5. Fetch program status
+        const { data: pStatus } = await supabase
+          .from('program_status')
+          .select('*')
+          .eq('student_id', studentId)
+          .single();
+
+        if (pStatus) {
+          setProgramStatus((pStatus.status as any) || 'active');
+          setFlagCount(pStatus.flag_count ?? 0);
+          setChancesUsed(pStatus.chances_used ?? 0);
+        }
+
+        // 6. Fetch coaching notes from API
+        try {
+          const notesRes = await fetch(`/api/tpc/notes?studentId=${studentId}`);
+          const notesData = await notesRes.json();
+          if (notesData.notes && notesData.notes.length > 0) {
+            const mappedNotes: CoachingNote[] = notesData.notes.map((n: any) => ({
+              id: n.id,
+              author: n.coordinator_id || 'Prof. Ravi Sharma',
+              timestamp: new Date(n.created_at).toLocaleDateString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              text: `“${n.note_text}”`,
+            }));
+            setNotes(mappedNotes);
+          }
+        } catch (e) {
+          console.warn('Could not fetch coach notes:', e);
+        }
+
+        // Merge profile into candidate state
+        if (profile) {
+          setCandidate({
+            name: profile.name || FALLBACK_CANDIDATE[studentId]?.name || 'Engineering Candidate',
+            rollNumber: profile.roll_number || FALLBACK_CANDIDATE[studentId]?.rollNumber || '2021BCS0000',
+            branch: profile.branch || FALLBACK_CANDIDATE[studentId]?.branch || 'Computer Science & Engineering',
+            degree: profile.degree || 'B.Tech',
+            cgpa: profile.cgpa || '8.45',
+            targetRole: latestAnalysis?.dream_role || FALLBACK_CANDIDATE[studentId]?.targetRole || 'Software Engineer',
+            targetCompany: latestAnalysis?.dream_company || FALLBACK_CANDIDATE[studentId]?.targetCompany || 'Tier-1 Tech',
+            readinessScore: latestAnalysis?.readiness_score || FALLBACK_CANDIDATE[studentId]?.readinessScore || 75,
+            school10th: profile.school_10th || 'Delhi Public School (CBSE)',
+            school10thMarks: profile.school_10th_marks || '94.2%',
+            school12th: profile.school_12th || 'National PU College (State Board)',
+            school12thMarks: profile.school_12th_marks || '96.0%',
+            achievements: profile.achievements_text || FALLBACK_CANDIDATE[studentId]?.achievements || '• Hackathon Participant\n• Active coder on LeetCode',
+            resumeFileName: `${profile.name?.toLowerCase().replace(/\s+/g, '_') || 'candidate'}_resume.pdf`,
+            resumeFileSize: '142 KB',
+          });
+        }
+      } catch (err) {
+        console.warn('Error fetching candidate audit data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCandidateData();
+  }, [studentId]);
+
+  const handleSaveNote = async () => {
     if (!newNoteText.trim()) return;
-    const newNote: CoachingNote = {
+    const session = getSession();
+    const authorName = session?.name || 'TPC Coordinator';
+
+    const tempNote: CoachingNote = {
       id: 'note_' + Date.now(),
-      author: 'Prof. Ravi Sharma',
+      author: authorName,
       timestamp: 'Just now',
       text: `“${newNoteText.trim()}”`,
     };
-    setNotes([newNote, ...notes]);
+
+    setNotes([tempNote, ...notes]);
+    const noteToSend = newNoteText.trim();
     setNewNoteText('');
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
+
+    try {
+      await fetch('/api/tpc/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          coordinatorId: authorName,
+          noteText: noteToSend,
+        }),
+      });
+      setToastMessage('Coaching note recorded in audit journal');
+      setTimeout(() => setToastMessage(null), 2500);
+    } catch (e) {
+      console.error('Error saving note:', e);
+    }
   };
 
   const handleGrantChance = async (e: React.FormEvent) => {
@@ -66,13 +272,16 @@ export default function StudentCoachingDetailPage() {
     if (!chanceReason.trim()) return;
 
     setGrantingChance(true);
+    const session = getSession();
+    const coordinatorIdentity = session?.name ? `${session.name} (TPC Coordinator)` : 'Prof. Ravi Sharma (TPC Coordinator)';
+
     try {
       const res = await fetch('/api/tpc/chances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId,
-          grantedBy: 'Prof. Ravi Sharma (TPC Coordinator)',
+          grantedBy: coordinatorIdentity,
           reason: chanceReason.trim(),
         }),
       });
@@ -104,7 +313,6 @@ export default function StudentCoachingDetailPage() {
       <div className="md:pl-[240px]">
         <main className="pt-16 bg-surface min-h-screen px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-[1300px] mx-auto w-full">
-            
             {/* Header Identity Section */}
             <div className="flex flex-col gap-5 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -114,31 +322,37 @@ export default function StudentCoachingDetailPage() {
                       Placement Cell
                     </Link>
                     <span>/</span>
+                    <Link href="/tpc/students" className="hover:text-primary transition-colors">
+                      Candidate Directory
+                    </Link>
+                    <span>/</span>
                     <span className="text-on-surface font-semibold">Candidate Dossier</span>
                   </div>
 
                   <div className="flex items-baseline gap-3 mt-1">
                     <h1 className="font-headline text-2xl sm:text-3xl text-primary font-semibold tracking-tight">
-                      Aarav Sundaram
+                      {candidate.name}
                     </h1>
-                    <span className={`font-mono text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full font-semibold ${
-                      programStatus === 'terminated'
-                        ? 'bg-[#FBE8E8] text-[#9E3636]'
-                        : programStatus === 'at_risk'
-                        ? 'bg-[#F7EEDB] text-[#B7832F]'
-                        : 'bg-[#E8F0EA] text-[#4F7A5A]'
-                    }`}>
+                    <span
+                      className={`font-mono text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full font-semibold ${
+                        programStatus === 'terminated'
+                          ? 'bg-[#FBE8E8] text-[#9E3636]'
+                          : programStatus === 'at_risk'
+                          ? 'bg-[#F7EEDB] text-[#B7832F]'
+                          : 'bg-[#E8F0EA] text-[#4F7A5A]'
+                      }`}
+                    >
                       {programStatus === 'terminated' ? 'Suspended (3 Flags)' : programStatus === 'at_risk' ? 'At Risk' : 'Active'}
                     </span>
                   </div>
                   <p className="font-body text-xs sm:text-sm text-on-surface-variant">
-                    B.Tech Computer Science & Engineering · USN: 4NI21CS042 · CGPA: 8.45 · Target: Junior Frontend Developer (Razorpay)
+                    {candidate.degree} {candidate.branch} · USN: {candidate.rollNumber} · CGPA: {candidate.cgpa} · Target: {candidate.targetRole} ({candidate.targetCompany})
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <Link
-                    href={`/analyses/${studentId}/mentor`}
+                    href={`/analyses/${analysisId}/mentor`}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-lowest text-primary font-semibold text-xs hover:bg-surface-container transition-colors shadow-xs border border-surface-variant"
                   >
                     <span className="material-symbols-outlined text-[16px]">chat_bubble_outline</span>
@@ -186,7 +400,7 @@ export default function StudentCoachingDetailPage() {
                       : 'text-on-surface-variant hover:bg-surface-container'
                   }`}
                 >
-                  Roadmap Sprints (2/6 Done)
+                  Roadmap Sprints ({roadmapTasks.filter(t => t.is_completed).length}/{roadmapTasks.length || 6} Done)
                 </button>
                 <button
                   onClick={() => setActiveTab('flags')}
@@ -197,9 +411,11 @@ export default function StudentCoachingDetailPage() {
                   }`}
                 >
                   <span>Flags & Chances</span>
-                  <span className={`px-1.5 py-0.2 rounded font-mono text-[10px] ${
-                    flagCount > 0 ? 'bg-error-container text-error' : 'bg-surface-container'
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.2 rounded font-mono text-[10px] ${
+                      flagCount > 0 ? 'bg-error-container text-error' : 'bg-surface-container'
+                    }`}
+                  >
                     {flagCount}/3
                   </span>
                 </button>
@@ -234,8 +450,8 @@ export default function StudentCoachingDetailPage() {
                     <span className="font-mono text-[10px] uppercase text-outline font-semibold">
                       Class 10th Schooling
                     </span>
-                    <p className="font-semibold text-primary text-sm">Delhi Public School, Bangalore (CBSE)</p>
-                    <p className="font-mono text-on-surface-variant">Score: 94.2% (10.0 CGPA equivalent)</p>
+                    <p className="font-semibold text-primary text-sm">{candidate.school10th}</p>
+                    <p className="font-mono text-on-surface-variant">Score: {candidate.school10thMarks}</p>
                   </div>
 
                   {/* Higher Secondary */}
@@ -243,8 +459,8 @@ export default function StudentCoachingDetailPage() {
                     <span className="font-mono text-[10px] uppercase text-outline font-semibold">
                       Class 12th / Pre-University
                     </span>
-                    <p className="font-semibold text-primary text-sm">National PU College, Bangalore (State Board)</p>
-                    <p className="font-mono text-on-surface-variant">Score: 96.0% (Distinction)</p>
+                    <p className="font-semibold text-primary text-sm">{candidate.school12th}</p>
+                    <p className="font-mono text-on-surface-variant">Score: {candidate.school12thMarks}</p>
                   </div>
 
                   {/* Undergraduate */}
@@ -253,8 +469,10 @@ export default function StudentCoachingDetailPage() {
                       Undergraduate Degree
                     </span>
                     <p className="font-semibold text-primary text-sm">National Institute of Engineering</p>
-                    <p className="text-on-surface">B.Tech · Computer Science & Engineering (Class of 2025)</p>
-                    <p className="font-mono text-primary font-bold">Cumulative CGPA: 8.45 / 10.0</p>
+                    <p className="text-on-surface">
+                      {candidate.degree} · {candidate.branch} (Class of 2025)
+                    </p>
+                    <p className="font-mono text-primary font-bold">Cumulative CGPA: {candidate.cgpa} / 10.0</p>
                   </div>
 
                   {/* Achievements */}
@@ -262,23 +480,23 @@ export default function StudentCoachingDetailPage() {
                     <span className="font-mono text-[10px] uppercase text-outline font-semibold">
                       Key Extracurriculars & Achievements
                     </span>
-                    <p className="font-body text-on-surface leading-relaxed">
-                      • Smart India Hackathon 2024 Finalist (Team Lead)<br />
-                      • Solved 350+ problems on LeetCode (Contest Rating: 1740)<br />
-                      • Open source contributor to React component libraries
+                    <p className="font-body text-on-surface leading-relaxed whitespace-pre-line">
+                      {candidate.achievements}
                     </p>
                   </div>
                 </div>
 
                 <div className="pt-4 border-t border-surface-container flex items-center justify-between text-xs font-mono">
-                  <span className="text-on-surface-variant">Uploaded Document: aarav_sundaram_resume.pdf (142 KB)</span>
-                  <button
-                    onClick={() => alert('Opening candidate verified resume in viewer.')}
+                  <span className="text-on-surface-variant">
+                    Uploaded Document: {candidate.resumeFileName} ({candidate.resumeFileSize})
+                  </span>
+                  <Link
+                    href={`/analyses/${analysisId}`}
                     className="text-secondary font-semibold hover:underline inline-flex items-center gap-1"
                   >
-                    <span>View original resume PDF</span>
+                    <span>View candidate skill map</span>
                     <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             )}
@@ -298,55 +516,37 @@ export default function StudentCoachingDetailPage() {
 
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="font-mono text-[10px] uppercase text-outline block">Chances Used</span>
-                      <span className="font-mono font-bold text-xs text-primary">{chancesUsed} of 3 maximum</span>
+                      <span className="font-mono text-xs text-on-surface-variant block">
+                        Chances Consumed: {chancesUsed}/3
+                      </span>
+                      <span className="font-mono text-xs text-on-surface-variant block">
+                        Active Flags: {flagCount}/3
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-surface-container bg-surface-container-low space-y-2">
+                <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-on-surface font-semibold">
-                      Current Active Flags: {flagCount} / 3
-                    </span>
-                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded font-semibold ${
-                      flagCount >= 3 ? 'bg-error-container text-error' : 'bg-surface-container-high text-on-surface-variant'
-                    }`}>
-                      {flagCount >= 3 ? 'TERMINATION THRESHOLD MET' : 'WITHIN ACTIVE THRESHOLD'}
+                    <h4 className="font-semibold text-xs text-primary">Compliance Status</h4>
+                    <span
+                      className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded font-bold ${
+                        programStatus === 'active'
+                          ? 'bg-[#E8F0EA] text-[#4F7A5A]'
+                          : programStatus === 'at_risk'
+                          ? 'bg-[#F7EEDB] text-[#B7832F]'
+                          : 'bg-[#FFDAD6] text-error'
+                      }`}
+                    >
+                      {programStatus.replace('_', ' ')}
                     </span>
                   </div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Students who accumulate 3 active flags for overdue roadmap task submissions are automatically suspended from placement drive matching. A TPC coordinator may grant up to 3 chances with a mandatory justification reason.
+                  <p className="text-xs text-on-surface-variant">
+                    Candidates who miss 3 consecutive roadmap milestone deadlines receive program suspension flags. Placement coordinators hold discretionary authority to grant up to 3 reinstatement chances upon student appeal.
                   </p>
                 </div>
 
-                {/* Flag History Table */}
-                <div className="space-y-3">
-                  <h3 className="font-headline text-sm font-semibold text-primary">
-                    Audit Log of Issued Flags
-                  </h3>
-
-                  {flagCount > 0 ? (
-                    <div className="p-3.5 rounded-xl border border-error/30 bg-error-container/10 flex items-start justify-between gap-3 text-xs font-mono">
-                      <div>
-                        <div className="flex items-center gap-2 text-error font-semibold mb-1">
-                          <span className="material-symbols-outlined text-[16px]">flag</span>
-                          <span>Flag #1: Missed Task Deadline</span>
-                        </div>
-                        <p className="font-body text-on-surface text-xs">
-                          Task "Build checkout payment modal with client-side form validation" exceeded due date by 72 hours without proof submission.
-                        </p>
-                        <span className="text-outline text-[10px] block mt-1">Issued: 28 Sept 2025 · Automated System Cron</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center text-xs font-mono text-on-surface-variant bg-surface-container-low rounded-xl">
-                      No active flags on candidate record. Clean compliance ledger.
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-surface-container flex justify-end">
+                <div className="pt-2 flex justify-end">
                   <button
                     onClick={() => setShowChanceModal(true)}
                     disabled={chancesUsed >= 3}
@@ -359,45 +559,99 @@ export default function StudentCoachingDetailPage() {
               </div>
             )}
 
-            {/* TAB: Diagnosis (Original) */}
+            {/* TAB: Diagnosis (Skill Map Competency Ledger) */}
             {activeTab === 'diagnosis' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Left 8 Cols: Skill ledger */}
                 <div className="lg:col-span-8 space-y-6">
                   <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 shadow-sm space-y-5">
-                    <h3 className="font-headline font-semibold text-lg text-primary">
-                      Technical Competency Ledger
-                    </h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-headline font-semibold text-lg text-primary">
+                        Technical Competency Ledger
+                      </h3>
+                      <Link
+                        href={`/analyses/${analysisId}`}
+                        className="font-mono text-xs text-secondary hover:underline font-semibold"
+                      >
+                        Open full interactive diagnosis →
+                      </Link>
+                    </div>
 
                     <div className="space-y-3">
-                      <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-xs text-primary">Component Architecture</span>
-                          <span className="font-mono text-[10px] text-[#4F7A5A] uppercase font-bold">Strong Evidence</span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant">Verified in project repositories. Clean modular design and functional hooks.</p>
-                      </div>
+                      {competencies.length === 0 ? (
+                        <>
+                          <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-xs text-primary">Component Architecture & Modular Design</span>
+                              <span className="font-mono text-[10px] text-[#4F7A5A] uppercase font-bold">Strong Evidence</span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant">
+                              Verified in candidate code repositories. Clean modular design and functional hooks.
+                            </p>
+                          </div>
 
-                      <div className="p-4 rounded-xl bg-surface-container-low border border-[#F7EEDB]">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-xs text-primary">React State Management</span>
-                          <span className="font-mono text-[10px] text-[#B7832F] uppercase font-bold">Needs Proof</span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant">Coursework relies on basic useState. Needs demonstration of Zustand or Redux store.</p>
-                      </div>
+                          <div className="p-4 rounded-xl bg-surface-container-low border border-[#F7EEDB]">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-xs text-primary">State Management & Store Hydration</span>
+                              <span className="font-mono text-[10px] text-[#B7832F] uppercase font-bold">Needs Proof</span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant">
+                              Coursework relies on basic component state. Needs demonstration of Zustand or Redux store.
+                            </p>
+                          </div>
 
-                      <div className="p-4 rounded-xl bg-surface-container-low border border-error-container">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-xs text-primary">Automated Test Suites</span>
-                          <span className="font-mono text-[10px] text-error uppercase font-bold">Placement Gap</span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant">No Vitest/Jest unit tests or RTL specs found in candidate GitHub submissions.</p>
-                      </div>
+                          <div className="p-4 rounded-xl bg-surface-container-low border border-error-container">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-xs text-primary">Automated Test Suites (Jest/Vitest)</span>
+                              <span className="font-mono text-[10px] text-error uppercase font-bold">Placement Gap</span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant">
+                              No automated unit tests or RTL specs found in candidate GitHub repositories.
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        competencies.map((comp) => (
+                          <div
+                            key={comp.id}
+                            className={`p-4 rounded-xl bg-surface-container-low border ${
+                              comp.status === 'strong'
+                                ? 'border-surface-container'
+                                : comp.status === 'needs_proof'
+                                ? 'border-[#F7EEDB]'
+                                : 'border-error-container'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-xs text-primary">{comp.name}</span>
+                              <span
+                                className={`font-mono text-[10px] uppercase font-bold ${
+                                  comp.status === 'strong'
+                                    ? 'text-[#4F7A5A]'
+                                    : comp.status === 'needs_proof'
+                                    ? 'text-[#B7832F]'
+                                    : 'text-error'
+                                }`}
+                              >
+                                {comp.status_label || (comp.status === 'strong' ? 'Strong Evidence' : comp.status === 'needs_proof' ? 'Needs Proof' : 'Placement Gap')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant">
+                              {comp.plain_explanation || comp.jd_requirement}
+                            </p>
+                            {comp.evidence_quote && (
+                              <p className="text-[11px] font-mono text-outline mt-1 italic">
+                                Evidence: &ldquo;{comp.evidence_quote}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right 4 Cols: Notes & Fit */}
+                {/* Right 4 Cols: Coaching Journal */}
                 <div className="lg:col-span-4 space-y-6">
                   <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 shadow-sm space-y-4">
                     <h3 className="font-headline font-semibold text-sm text-primary">Coaching Journal</h3>
@@ -417,7 +671,7 @@ export default function StudentCoachingDetailPage() {
                       placeholder="Add coaching note..."
                       value={newNoteText}
                       onChange={(e) => setNewNoteText(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-surface-variant bg-surface-container-low text-xs text-on-surface focus:outline-none"
+                      className="w-full p-2.5 rounded-lg border border-surface-variant bg-surface-container-low text-xs text-on-surface focus:outline-none focus:border-primary"
                     />
                     <div className="flex justify-end">
                       <button
@@ -436,49 +690,116 @@ export default function StudentCoachingDetailPage() {
             {/* TAB: Roadmap Progress */}
             {activeTab === 'roadmap' && (
               <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
-                <h3 className="font-headline font-semibold text-lg text-primary">
-                  Sprint Roadmap Tasks & Evidence Outcomes
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-headline font-semibold text-lg text-primary">
+                    Sprint Roadmap Tasks & Evidence Outcomes
+                  </h3>
+                  <Link
+                    href={`/analyses/${analysisId}/roadmap`}
+                    className="font-mono text-xs text-secondary hover:underline font-semibold"
+                  >
+                    View candidate roadmap →
+                  </Link>
+                </div>
+
                 <div className="space-y-3 text-xs">
-                  <div className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-primary">Migrate local cart state to Zustand store</h4>
-                      <p className="text-on-surface-variant text-[11px] mt-0.5">Proof submitted: GitHub PR #14 merged with persistent storage hooks.</p>
-                    </div>
-                    <span className="font-mono text-[#4F7A5A] font-semibold">Completed ✓</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-primary">Implement asynchronous cart sync with optimistic UI updates</h4>
-                      <p className="text-on-surface-variant text-[11px] mt-0.5">Proof submitted: Screen recording demo of rollback on 500 error.</p>
-                    </div>
-                    <span className="font-mono text-[#4F7A5A] font-semibold">Completed ✓</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl border border-error/40 bg-error-container/10 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-error">Build checkout payment modal with client-side form validation</h4>
-                      <p className="text-on-surface-variant text-[11px] mt-0.5">Deadline: 25 Sept (Overdue by 3 days). Flag issued.</p>
-                    </div>
-                    <span className="font-mono text-error font-semibold">Overdue Flagged</span>
-                  </div>
+                  {roadmapTasks.length === 0 ? (
+                    <>
+                      <div className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-primary">Migrate local cart state to Zustand store</h4>
+                          <p className="text-on-surface-variant text-[11px] mt-0.5">
+                            Proof submitted: GitHub PR #14 merged with persistent storage hooks.
+                          </p>
+                        </div>
+                        <span className="font-mono text-[#4F7A5A] font-semibold">Completed ✓</span>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-primary">Write automated Vitest unit tests for webhook signature validation</h4>
+                          <p className="text-on-surface-variant text-[11px] mt-0.5">
+                            Proof submitted: Test suite with 100% branch coverage over HMAC SHA256 signatures.
+                          </p>
+                        </div>
+                        <span className="font-mono text-[#4F7A5A] font-semibold">Completed ✓</span>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-primary">Deploy Docker containerized microservice to staging cluster</h4>
+                          <p className="text-on-surface-variant text-[11px] mt-0.5">
+                            In progress: Multi-stage Dockerfile authored, awaiting cluster health check.
+                          </p>
+                        </div>
+                        <span className="font-mono text-secondary font-semibold">In Progress</span>
+                      </div>
+                    </>
+                  ) : (
+                    roadmapTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-3.5 rounded-xl border border-surface-container flex items-center justify-between"
+                      >
+                        <div>
+                          <h4 className="font-semibold text-primary">{t.title}</h4>
+                          <p className="text-on-surface-variant text-[11px] mt-0.5">
+                            {t.description || t.evidence_outcome || 'Scheduled sprint task'}
+                          </p>
+                        </div>
+                        <span
+                          className={`font-mono text-xs font-semibold ${
+                            t.is_completed ? 'text-[#4F7A5A]' : 'text-secondary'
+                          }`}
+                        >
+                          {t.is_completed ? 'Completed ✓' : 'Pending'}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
 
-            {/* TAB: Notes */}
+            {/* TAB: Coaching Notes Dedicated */}
             {activeTab === 'notes' && (
-              <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
-                <h3 className="font-headline font-semibold text-lg text-primary">All Coaching Observations</h3>
-                <div className="space-y-3">
+              <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+                <div>
+                  <span className="font-mono text-[10px] uppercase text-secondary font-semibold">
+                    Advisory Records
+                  </span>
+                  <h2 className="font-headline text-xl text-primary font-semibold mt-0.5">
+                    Coaching & Placement Desk Interventions
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
                   {notes.map((n) => (
-                    <div key={n.id} className="p-4 rounded-xl bg-surface-container-low border border-surface-container text-xs space-y-1">
-                      <div className="flex justify-between font-mono text-[11px]">
+                    <div key={n.id} className="p-4 rounded-xl bg-surface-container-low border border-surface-container space-y-1">
+                      <div className="flex justify-between font-mono text-xs text-outline">
                         <span className="font-semibold text-primary">{n.author}</span>
-                        <span className="text-outline">{n.timestamp}</span>
+                        <span>{n.timestamp}</span>
                       </div>
-                      <p className="font-body text-on-surface">{n.text}</p>
+                      <p className="text-sm text-on-surface leading-relaxed">{n.text}</p>
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-4 border-t border-surface-container space-y-3">
+                  <textarea
+                    rows={3}
+                    placeholder="Record formal coaching note or placement interview remarks..."
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-surface-variant bg-surface-container-low text-xs text-on-surface focus:outline-none focus:border-primary"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveNote}
+                      disabled={!newNoteText.trim()}
+                      className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-semibold text-xs shadow-xs disabled:opacity-50"
+                    >
+                      Record note in journal
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -502,7 +823,7 @@ export default function StudentCoachingDetailPage() {
                   Grant Reinstatement Chance
                 </h3>
                 <p className="font-body text-xs text-on-surface-variant">
-                  Allows up to 3 chances. Clears active flags and restores program standing.
+                  Candidate: {candidate.name} ({candidate.rollNumber})
                 </p>
               </div>
               <button
@@ -514,47 +835,38 @@ export default function StudentCoachingDetailPage() {
             </div>
 
             <form onSubmit={handleGrantChance} className="space-y-4">
-              <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container font-mono text-[11px]">
-                <div className="flex justify-between mb-1">
-                  <span className="text-on-surface-variant">Candidate:</span>
-                  <span className="text-primary font-semibold">Aarav Sundaram</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Chance Number:</span>
-                  <span className="text-secondary font-bold">Chance #{chancesUsed + 1} of 3</span>
-                </div>
-              </div>
-
               <div>
                 <label className="font-semibold text-on-surface block mb-1">
-                  Mandatory Coordinator Justification Reason *
+                  Justification Reason *
                 </label>
                 <textarea
-                  required
                   rows={3}
-                  placeholder="Record formal institutional rationale (e.g. Student submitted documented medical leave certificate; approved extension on checkout modal sprint)..."
+                  required
+                  placeholder="Provide institutional rationale (e.g. Approved medical leave, completed catch-up milestone, academic review)..."
                   value={chanceReason}
                   onChange={(e) => setChanceReason(e.target.value)}
                   className="w-full p-2.5 rounded-lg bg-surface-container-low border border-surface-variant text-on-surface focus:outline-none focus:border-primary font-body"
                 />
               </div>
 
+              <div className="p-3 rounded-lg bg-surface-container-low border border-surface-container text-[11px] text-on-surface-variant">
+                Granting a chance voids all active program flags and restores the candidate&apos;s standing to Active. A formal compliance log entry is recorded in the institutional audit ledger.
+              </div>
+
               <div className="pt-3 border-t border-surface-container flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowChanceModal(false)}
-                  disabled={grantingChance}
                   className="px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={grantingChance || !chanceReason.trim()}
-                  className="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                  disabled={grantingChance}
+                  className="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold shadow-sm disabled:opacity-50"
                 >
-                  {grantingChance && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
-                  <span>Grant Chance & Clear Flags</span>
+                  {grantingChance ? 'Granting...' : 'Grant Chance & Void Flags'}
                 </button>
               </div>
             </form>
@@ -562,7 +874,7 @@ export default function StudentCoachingDetailPage() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Action Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-primary text-on-primary px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-mono animate-fade-in">
           <span className="material-symbols-outlined text-[16px] text-[#4F7A5A]">check_circle</span>

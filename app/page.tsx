@@ -129,6 +129,7 @@ export default function WelcomePage() {
           name: data.user.name,
           email: data.user.email,
           role: data.user.role,
+          onboardingCompleted: true,
         });
       }
 

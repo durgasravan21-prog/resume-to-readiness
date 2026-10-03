@@ -4,13 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export default function Sidebar() {
+export default function Sidebar({ role }: { role?: 'coordinator' | 'student' } = {}) {
   const pathname = usePathname();
 
   const links = [
     { label: 'Overview', href: '/tpc', icon: 'grid_view' },
     { label: 'Students', href: '/tpc/students', icon: 'school' },
     { label: 'Roles', href: '/tpc/roles', icon: 'work_outline' },
+    { label: 'Mentorship', href: '/mentor', icon: 'forum' },
     { label: 'Reports', href: '/tpc/reports', icon: 'analytics' },
     { label: 'Settings', href: '/tpc/settings', icon: 'settings' },
   ];

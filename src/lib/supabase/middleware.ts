@@ -56,7 +56,7 @@ export async function updateSession(request: NextRequest) {
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));
       if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
     }
-    if (pathname.startsWith('/onboarding') && request.cookies.get('readiness_onboarding_completed')?.value === 'true') {
+    if (pathname.startsWith('/onboarding') && (request.cookies.get('readiness_onboarding_completed')?.value === 'true' || request.cookies.get('readiness_user_id')?.value === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee')) {
       return NextResponse.redirect(new URL('/home', request.url));
     }
     if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings') || pathname.startsWith('/onboarding')) {
@@ -91,17 +91,18 @@ export async function updateSession(request: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, onboarding_completed')
-      .eq('id', user.id)
+      .or(`id.eq.${user.id},email.eq.${user.email || ''}`)
       .single();
 
     let role = profile?.role || 'student';
-    const cookieOnboarded = request.cookies.get('readiness_onboarding_completed')?.value === 'true';
+    const isDurga = user.email === 'durgasravan21@gmail.com' || user.id === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee';
+    const cookieOnboarded = request.cookies.get('readiness_onboarding_completed')?.value === 'true' || isDurga;
     const onboardingCompleted = profile?.onboarding_completed || cookieOnboarded;
 
     // Allow durgasravan21@gmail.com, admins, and faculty coordinators to freely toggle views
     const activeViewRole = request.cookies.get('readiness_role')?.value;
     const isSpecialUser =
-      user.email === 'durgasravan21@gmail.com' ||
+      isDurga ||
       profile?.role === 'admin' ||
       profile?.role === 'coordinator' ||
       user.email?.includes('placement') ||
@@ -110,9 +111,11 @@ export async function updateSession(request: NextRequest) {
     if (isSpecialUser) {
       if (pathname.startsWith('/tpc')) {
         role = 'coordinator';
+      } else if (pathname.startsWith('/mentor')) {
+        role = 'coordinator';
       } else if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) {
         role = 'student';
-      } else if (activeViewRole === 'coordinator' || activeViewRole === 'student') {
+      } else if (activeViewRole === 'coordinator' || activeViewRole === 'student' || activeViewRole === 'mentor') {
         role = activeViewRole;
       }
     }
@@ -124,26 +127,26 @@ export async function updateSession(request: NextRequest) {
 
     // Role-based route guard
     if (pathname === '/' || (pathname.startsWith('/onboarding') && onboardingCompleted)) {
-      if (role === 'student') return NextResponse.redirect(new URL('/home', request.url));
+      if (role === 'student' || isDurga) return NextResponse.redirect(new URL('/home', request.url));
       if (role === 'mentor') return NextResponse.redirect(new URL('/mentor', request.url));
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));
-      if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
+      if (role === 'admin') return NextResponse.redirect(new URL('/home', request.url));
     }
 
     if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) {
-      if (role !== 'student' && role !== 'admin') {
+      if (role !== 'student' && role !== 'admin' && !isSpecialUser) {
         return NextResponse.redirect(new URL(role === 'coordinator' ? '/tpc' : '/mentor', request.url));
       }
     }
 
     if (pathname.startsWith('/tpc')) {
-      if (role !== 'coordinator' && role !== 'admin') {
+      if (role !== 'coordinator' && role !== 'admin' && !isSpecialUser) {
         return NextResponse.redirect(new URL('/home', request.url));
       }
     }
 
     if (pathname.startsWith('/mentor')) {
-      if (role !== 'mentor' && role !== 'admin') {
+      if (role !== 'mentor' && role !== 'coordinator' && role !== 'admin' && !isSpecialUser) {
         return NextResponse.redirect(new URL('/home', request.url));
       }
     }

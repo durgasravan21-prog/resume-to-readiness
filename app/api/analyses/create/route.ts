@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
 
     // 2. Extension Check
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!['.pdf', '.docx'].includes(ext)) {
+    if (!['.pdf', '.docx', '.doc'].includes(ext)) {
       return NextResponse.json(
-        { error: 'Invalid file format. Please upload a PDF or DOCX file.' },
+        { error: 'Invalid file format. Please upload a PDF or Word document (.docx, .doc).' },
         { status: 400 }
       );
     }

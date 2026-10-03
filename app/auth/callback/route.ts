@@ -53,7 +53,11 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/onboarding`);
       }
 
-      if (!profile.onboarding_completed && profile.role === 'student') {
+      if (profile.onboarding_completed || user.email === 'durgasravan21@gmail.com') {
+        cookieStore.set('readiness_onboarding_completed', 'true', { path: '/', maxAge: 604800, sameSite: 'lax' });
+      }
+
+      if (!profile.onboarding_completed && profile.role === 'student' && user.email !== 'durgasravan21@gmail.com') {
         return NextResponse.redirect(`${origin}/onboarding`);
       }
 
@@ -63,8 +67,8 @@ export async function GET(request: Request) {
       if (profile.role === 'mentor') {
         return NextResponse.redirect(`${origin}/mentor`);
       }
-      if (profile.role === 'admin') {
-        return NextResponse.redirect(`${origin}/admin`);
+      if (profile.role === 'admin' || user.email === 'durgasravan21@gmail.com') {
+        return NextResponse.redirect(`${origin}/home`);
       }
 
       return NextResponse.redirect(`${origin}${next}`);

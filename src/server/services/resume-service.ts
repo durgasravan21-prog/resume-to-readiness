@@ -39,12 +39,12 @@ export async function uploadResume(
     const parsed = await extractPdfText(fileBuffer);
     rawText = parsed.text;
     hasTextLayer = parsed.hasTextLayer;
-  } else if (ext === '.docx') {
+  } else if (ext === '.docx' || ext === '.doc') {
     const parsed = await extractDocxText(fileBuffer);
     rawText = parsed.text;
     hasTextLayer = parsed.hasTextLayer;
   } else {
-    throw new AppError('INVALID_FORMAT', 'Invalid file format. Please upload a PDF or DOCX document.', 400);
+    throw new AppError('INVALID_FORMAT', 'Invalid file format. Please upload a PDF or Word document (.docx, .doc).', 400);
   }
 
   if (!hasTextLayer || rawText.trim().length < 30) {
