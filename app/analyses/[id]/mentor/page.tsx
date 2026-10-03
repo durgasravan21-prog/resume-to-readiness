@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import { createClient } from '@/lib/supabase/client';
@@ -27,29 +27,109 @@ const DEFAULT_WELCOME: ChatMessage = {
   sender: 'mentor',
   sender_name: 'Training & Placement Cell',
   created_at: new Date().toISOString(),
-  message_text: 'Welcome to the faculty mentor consultation channel. Send a message describing your query, and the assigned placement mentor will respond shortly.',
+  message_text: 'Welcome to the faculty mentor consultation channel. Send a message describing your query, and your assigned department placement mentor will respond directly.',
 };
 
 const SUGGESTED_PROMPTS = [
   'I need guidance on my roadmap priorities.',
   'Can you clarify my skill gap assessment?',
-  'What should I prepare first for the upcoming drive?',
+  'What should I prepare first for the upcoming campus drive?',
 ];
 
 export default function MentorPage() {
   const params = useParams();
-  const analysisId = (params?.id as string) || 'default';
+  const searchParams = useSearchParams();
+  const rawAnalysisId = (params?.id as string) || 'default';
+  const isFacultyViewParam = searchParams.get('view') === 'faculty';
+
   const supabase = createClient();
   const session = getSession();
 
+  // Check if viewing in faculty mode
+  const isFacultyRole = (session?.role as string) === 'coordinator' || (session?.role as string) === 'admin' || (session?.role as string) === 'mentor';
+  const isFacultyMode = isFacultyViewParam || isFacultyRole;
+
+  const [analysisId, setAnalysisId] = useState<string>(rawAnalysisId);
+  const [studentInfo, setStudentInfo] = useState<{ name: string; branch: string; roll: string } | null>(null);
+  const [mentorName, setMentorName] = useState<string>('Dr. Sunita Rao');
+  const [mentorDept, setMentorDept] = useState<string>('Computer Science & Engineering');
   const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_WELCOME]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [chatStatus, setChatStatus] = useState<'open' | 'waiting_for_mentor'>('open');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Fetch initial messages from API
-  const fetchMessages = async () => {
+  // Resolve effective analysis ID if visiting 'default' as a logged-in student
+  useEffect(() => {
+    async function resolveAnalysis() {
+      if (rawAnalysisId === 'default' && session?.id && !isFacultyMode) {
+        try {
+          const { data } = await supabase
+            .from('analyses')
+            .select('id')
+            .eq('user_id', session.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (data?.id) {
+            setAnalysisId(data.id);
+            return;
+          }
+        } catch {
+          // Keep default
+        }
+      }
+      setAnalysisId(rawAnalysisId);
+    }
+    resolveAnalysis();
+  }, [rawAnalysisId, session?.id, isFacultyMode]);
+
+  // Load student & assigned faculty details
+  useEffect(() => {
+    async function loadMetadata() {
+      try {
+        const { data: analysis } = await supabase
+          .from('analyses')
+          .select('user_id, dream_role')
+          .eq('id', analysisId)
+          .single();
+
+        if (analysis?.user_id) {
+          const [profileRes, assignRes] = await Promise.all([
+            supabase.from('profiles').select('name, branch, roll_number').eq('id', analysis.user_id).single(),
+            supabase.from('mentor_assignments').select('mentor_id').eq('student_id', analysis.user_id).single(),
+          ]);
+
+          if (profileRes.data) {
+            setStudentInfo({
+              name: profileRes.data.name || 'Candidate',
+              branch: profileRes.data.branch || 'Engineering',
+              roll: profileRes.data.roll_number || '4NI21CS001',
+            });
+          }
+
+          const mentorId = assignRes.data?.mentor_id || 'fac_cs_02';
+          const { data: mentorProfile } = await supabase
+            .from('profiles')
+            .select('name, branch, role')
+            .eq('id', mentorId)
+            .single();
+
+          if (mentorProfile) {
+            setMentorName(mentorProfile.name || 'Dr. Sunita Rao');
+            setMentorDept(mentorProfile.branch || 'Placement Mentor');
+          }
+        }
+      } catch (e) {
+        console.warn('Metadata load notice:', e);
+      }
+    }
+    if (analysisId) loadMetadata();
+  }, [analysisId]);
+
+  // Fetch messages from API
+  const fetchMessages = useCallback(async () => {
     try {
       const res = await fetch(`/api/mentor/messages?analysisId=${analysisId}`);
       const data = await res.json();
@@ -62,36 +142,48 @@ export default function MentorPage() {
     } catch (e) {
       console.warn('Could not fetch messages:', e);
     }
-  };
+  }, [analysisId]);
 
   useEffect(() => {
     fetchMessages();
 
-    // Supabase Realtime channel subscription
+    // 1. Supabase Realtime channel subscription for instant two-way messaging
     const channel = supabase
       .channel(`mentor_chat_${analysisId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'mentor_messages',
           filter: `analysis_id=eq.${analysisId}`,
         },
         (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as ChatMessage;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+            // If mentor sent a message, immediately open the chat
+            if (newMsg.sender === 'mentor') {
+              setChatStatus('open');
+            }
+          } else {
+            fetchMessages();
+          }
         }
       )
       .subscribe();
 
+    // 2. Fallback polling every 3.5 seconds to guarantee synchronization
+    const interval = setInterval(fetchMessages, 3500);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
-  }, [analysisId]);
+  }, [analysisId, fetchMessages]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,16 +191,24 @@ export default function MentorPage() {
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || inputValue.trim();
-    if (!text || sending || chatStatus === 'waiting_for_mentor') return;
+    if (!text || sending) return;
+
+    // Only block student when actively waiting for mentor
+    if (!isFacultyMode && chatStatus === 'waiting_for_mentor') return;
 
     setSending(true);
     if (!textToSend) setInputValue('');
 
+    const senderType = isFacultyMode ? 'mentor' : 'student';
+    const senderName = isFacultyMode
+      ? (session?.name || mentorName || 'Faculty Mentor')
+      : (session?.name || 'Student Candidate');
+
     const optimisticId = 'msg_opt_' + Date.now();
     const optimisticMsg: ChatMessage = {
       id: optimisticId,
-      sender: 'student',
-      sender_name: session?.name || 'Student',
+      sender: senderType,
+      sender_name: senderName,
       created_at: new Date().toISOString(),
       message_text: text,
     };
@@ -121,17 +221,16 @@ export default function MentorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           analysisId,
-          userId: session?.id || 'anonymous',
-          sender: 'student',
-          senderName: session?.name || 'Student',
+          userId: session?.id || (isFacultyMode ? 'fac_cs_02' : 'student_user'),
+          sender: senderType,
+          senderName: senderName,
           messageText: text,
         }),
       });
 
       const data = await res.json();
 
-      if (res.status === 429) {
-        // Student is blocked from sending more messages
+      if (res.status === 429 && !isFacultyMode) {
         setChatStatus('waiting_for_mentor');
         return;
       }
@@ -140,8 +239,12 @@ export default function MentorPage() {
         setChatStatus(data.chatStatus);
       }
 
-      // Refresh to pick up system auto-acknowledgment
-      setTimeout(fetchMessages, 800);
+      // If faculty replied, chat is unlocked
+      if (isFacultyMode) {
+        setChatStatus('open');
+      }
+
+      setTimeout(fetchMessages, 600);
     } catch (err) {
       console.error('Network error sending message:', err);
     } finally {
@@ -154,31 +257,73 @@ export default function MentorPage() {
       <TopNav />
 
       <main className="flex-1 w-full pt-16 bg-surface flex flex-col">
+        {/* Faculty Mode Context Banner */}
+        {isFacultyMode && (
+          <div className="bg-primary text-on-primary px-4 sm:px-8 py-2.5 flex items-center justify-between text-xs font-mono shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#E8F0EA] animate-pulse"></span>
+              <span className="font-semibold uppercase tracking-wider">Faculty Consultation Console</span>
+              <span>•</span>
+              <span>Reviewing candidate: {studentInfo?.name || 'Candidate'} ({studentInfo?.branch || 'Department'})</span>
+            </div>
+            <Link
+              href="/mentor"
+              className="px-2.5 py-1 rounded bg-on-primary/10 hover:bg-on-primary/20 text-on-primary font-semibold flex items-center gap-1 transition-colors"
+            >
+              <span>← Back to Mentor Console</span>
+            </Link>
+          </div>
+        )}
+
         <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col">
           {/* Breadcrumb & Header */}
           <div className="mb-4">
             <nav className="flex items-center gap-2 text-xs font-mono text-on-surface-variant mb-2">
-              <Link href={`/analyses/${analysisId}`} className="hover:text-primary transition-colors">
-                Skill Map
-              </Link>
-              <span>/</span>
-              <span className="text-primary font-semibold">Human Mentor Consultation</span>
+              {isFacultyMode ? (
+                <>
+                  <Link href="/mentor" className="hover:text-primary transition-colors">
+                    Faculty Console
+                  </Link>
+                  <span>/</span>
+                  <Link href={`/analyses/${analysisId}?view=faculty`} className="hover:text-primary transition-colors">
+                    Mentee Appraisal
+                  </Link>
+                  <span>/</span>
+                  <span className="text-primary font-semibold">Active Consultation</span>
+                </>
+              ) : (
+                <>
+                  <Link href={`/analyses/${analysisId}`} className="hover:text-primary transition-colors">
+                    Skill Map
+                  </Link>
+                  <span>/</span>
+                  <span className="text-primary font-semibold">Faculty Mentor Consultation</span>
+                </>
+              )}
             </nav>
 
             <div className="flex items-center justify-between pb-3 border-b border-surface-variant">
               <div>
                 <h1 className="font-headline text-xl sm:text-2xl text-primary font-semibold">
-                  Assigned Faculty Mentor Guidance
+                  {isFacultyMode
+                    ? `Mentorship Consultation with ${studentInfo?.name || 'Candidate'}`
+                    : 'Assigned Faculty Mentor Guidance'}
                 </h1>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Direct consultation with verified campus placement advisors.
+                  {isFacultyMode
+                    ? `Direct verified intervention channel for candidate ${studentInfo?.roll || ''} · ${studentInfo?.branch || ''}`
+                    : 'Direct consultation with your verified campus placement advisor.'}
                 </p>
               </div>
 
               <div className="flex items-center gap-2 text-xs font-mono">
                 <span className="w-2 h-2 rounded-full bg-[#4F7A5A] animate-pulse"></span>
-                <span className="text-on-surface-variant hidden sm:inline">Advisor Active:</span>
-                <span className="text-primary font-semibold">Prof. Ravi Sharma</span>
+                <span className="text-on-surface-variant hidden sm:inline">
+                  {isFacultyMode ? 'Logged in as:' : 'Advisor Active:'}
+                </span>
+                <span className="text-primary font-semibold">
+                  {isFacultyMode ? (session?.name || 'Faculty Mentor') : mentorName}
+                </span>
               </div>
             </div>
           </div>
@@ -191,11 +336,16 @@ export default function MentorPage() {
               return (
                 <div
                   key={msg.id}
-                  className={`flex flex-col ${isStudent ? 'items-end' : 'items-start'}`}
+                  className={`flex flex-col ${
+                    isFacultyMode
+                      ? isStudent ? 'items-start' : isSystem ? 'items-center' : 'items-end'
+                      : isStudent ? 'items-end' : isSystem ? 'items-center' : 'items-start'
+                  }`}
                 >
                   <div className="flex items-center gap-2 mb-1 px-1">
                     <span className={`text-[11px] font-mono ${isSystem ? 'text-secondary font-semibold' : 'text-on-surface-variant'}`}>
                       {msg.sender_name}
+                      {msg.sender === 'mentor' && ' (Placement Mentor)'}
                     </span>
                     <span className="text-[10px] font-mono text-outline">
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -205,10 +355,14 @@ export default function MentorPage() {
                   <div
                     className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed shadow-xs ${
                       isSystem
-                        ? 'bg-secondary/10 text-on-surface border border-secondary/30 rounded-tl-none italic'
-                        : isStudent
-                          ? 'bg-primary text-on-primary rounded-tr-none'
-                          : 'bg-surface-container-low text-on-surface border border-surface-variant rounded-tl-none'
+                        ? 'bg-secondary/10 text-on-surface border border-secondary/30 rounded-xl text-center italic text-xs'
+                        : isFacultyMode
+                          ? isStudent
+                            ? 'bg-surface-container-low text-on-surface border border-surface-variant rounded-tl-none'
+                            : 'bg-primary text-on-primary rounded-tr-none'
+                          : isStudent
+                            ? 'bg-primary text-on-primary rounded-tr-none'
+                            : 'bg-surface-container-low text-on-surface border border-surface-variant rounded-tl-none'
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{msg.message_text}</p>
@@ -234,8 +388,8 @@ export default function MentorPage() {
               );
             })}
 
-            {/* Waiting for Mentor Indicator */}
-            {chatStatus === 'waiting_for_mentor' && (
+            {/* Waiting for Mentor Indicator (Visible only to students when actively waiting) */}
+            {!isFacultyMode && chatStatus === 'waiting_for_mentor' && (
               <div className="flex flex-col items-start">
                 <div className="max-w-[80%] rounded-2xl p-4 bg-surface-container-high border border-outline-variant/30 rounded-tl-none">
                   <div className="flex items-center gap-2 text-xs text-on-surface-variant">
@@ -243,7 +397,7 @@ export default function MentorPage() {
                     <span className="font-mono font-semibold">Waiting for faculty mentor to join...</span>
                   </div>
                   <p className="text-[11px] text-on-surface-variant mt-1">
-                    Your message has been forwarded. Messaging is paused until the mentor responds.
+                    Your consultation query has been logged. Messaging will resume once your mentor replies.
                   </p>
                 </div>
               </div>
@@ -252,8 +406,8 @@ export default function MentorPage() {
             <div ref={chatBottomRef} />
           </div>
 
-          {/* Quick Discussion Starters */}
-          {chatStatus !== 'waiting_for_mentor' && (
+          {/* Quick Prompts (Visible to students when chat is open) */}
+          {!isFacultyMode && chatStatus !== 'waiting_for_mentor' && (
             <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 no-scrollbar">
               <span className="text-[10px] font-mono uppercase text-outline shrink-0">
                 Prompt Mentor:
@@ -263,7 +417,7 @@ export default function MentorPage() {
                   key={idx}
                   onClick={() => handleSendMessage(prompt)}
                   disabled={sending}
-                  className="px-3 py-1.5 rounded-full border border-surface-variant bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-body transition-colors shrink-0 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-full border border-surface-variant bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-body transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
                 >
                   {prompt}
                 </button>
@@ -271,12 +425,12 @@ export default function MentorPage() {
             </div>
           )}
 
-          {/* Chat Input Field */}
-          {chatStatus === 'waiting_for_mentor' ? (
+          {/* Chat Input Bar */}
+          {!isFacultyMode && chatStatus === 'waiting_for_mentor' ? (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-high border border-outline-variant/30 text-on-surface-variant">
               <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse shrink-0"></span>
               <p className="text-xs font-body">
-                Messaging is paused until the faculty mentor responds. You will be able to continue once a mentor joins the conversation.
+                Messaging is paused until the faculty mentor responds. You will be able to continue once the mentor replies to your query.
               </p>
             </div>
           ) : (
@@ -289,7 +443,11 @@ export default function MentorPage() {
             >
               <input
                 type="text"
-                placeholder="Ask your mentor about specific skill gaps, project architectures, or campus rounds..."
+                placeholder={
+                  isFacultyMode
+                    ? `Reply as ${session?.name || mentorName} (Placement Faculty)...`
+                    : 'Ask your mentor about specific skill gaps, project architectures, or campus rounds...'
+                }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 className="flex-1 px-4 py-3 rounded-xl border border-surface-variant bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:border-primary font-body"
@@ -297,10 +455,10 @@ export default function MentorPage() {
               <button
                 type="submit"
                 disabled={sending || !inputValue.trim()}
-                className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 {sending && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
-                <span>Send Message</span>
+                <span>{isFacultyMode ? 'Send Reply' : 'Send Message'}</span>
                 <span className="material-symbols-outlined text-[16px]">send</span>
               </button>
             </form>
@@ -308,7 +466,7 @@ export default function MentorPage() {
         </div>
       </main>
 
-      <MobileTabBar role="student" />
+      <MobileTabBar role={isFacultyMode ? 'coordinator' : 'student'} />
     </div>
   );
 }

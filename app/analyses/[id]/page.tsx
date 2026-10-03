@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import LowConfidenceBanner from '@/components/ui/LowConfidenceBanner';
 import { createClient } from '@/lib/supabase/client';
+import { getSession } from '@/lib/auth';
 import { CheckCircle, HelpCircle, XCircle, Download, ArrowRight, X } from 'lucide-react';
 
 interface SkillItem {
@@ -22,6 +23,7 @@ interface SkillItem {
 
 interface AnalysisData {
   id: string;
+  user_id?: string;
   readiness_score: number;
   confidence_score: number;
   summary_sentence: string;
@@ -33,10 +35,18 @@ interface AnalysisData {
 export default function SkillMapPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const analysisId = params?.id as string;
   const supabase = createClient();
+  const session = getSession();
+
+  const isFacultyMode = searchParams.get('view') === 'faculty' ||
+    (session?.role as string) === 'coordinator' ||
+    (session?.role as string) === 'admin' ||
+    (session?.role as string) === 'mentor';
 
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
+  const [candidateProfile, setCandidateProfile] = useState<{ name: string; roll: string; branch: string } | null>(null);
   const [skillItems, setSkillItems] = useState<SkillItem[]>([]);
   const [activeDrawerSkill, setActiveDrawerSkill] = useState<SkillItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +84,23 @@ export default function SkillMapPage() {
           }
         }
 
-        if (anData) setAnalysis(anData);
+        if (anData) {
+          setAnalysis(anData);
+          if (anData.user_id) {
+            const { data: prof } = await supabase
+              .from('profiles')
+              .select('name, roll_number, branch')
+              .eq('id', anData.user_id)
+              .single();
+            if (prof) {
+              setCandidateProfile({
+                name: prof.name || 'Candidate',
+                roll: prof.roll_number || '',
+                branch: prof.branch || 'Engineering',
+              });
+            }
+          }
+        }
         if (itData && itData.length > 0) {
           setSkillItems(itData);
         } else {
@@ -181,7 +207,39 @@ export default function SkillMapPage() {
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-12">
       <TopNav />
 
-      <main className="flex-1 w-full pt-16 bg-surface">
+      {/* Faculty Mode Context Banner */}
+      {isFacultyMode && (
+        <div className="bg-primary text-on-primary px-4 sm:px-8 py-2.5 flex items-center justify-between text-xs font-mono shadow-sm mt-16">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#E8F0EA] animate-pulse"></span>
+            <span className="font-semibold uppercase tracking-wider">Faculty Diagnostic Appraisal</span>
+            <span>•</span>
+            <span>Candidate: <strong>{candidateProfile?.name || 'Candidate'}</strong> ({candidateProfile?.roll || ''} · {candidateProfile?.branch || ''})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/analyses/${analysisId}/roadmap?view=faculty`}
+              className="px-2.5 py-1 rounded bg-on-primary/10 hover:bg-on-primary/20 text-on-primary font-semibold transition-colors"
+            >
+              Roadmap
+            </Link>
+            <Link
+              href={`/analyses/${analysisId}/mentor?view=faculty`}
+              className="px-2.5 py-1 rounded bg-on-primary/10 hover:bg-on-primary/20 text-on-primary font-semibold transition-colors"
+            >
+              Consultation Chat
+            </Link>
+            <Link
+              href="/mentor"
+              className="px-2.5 py-1 rounded bg-secondary text-on-secondary font-semibold transition-colors"
+            >
+              ← Mentor Console
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <main className={`flex-1 w-full ${isFacultyMode ? 'pt-4' : 'pt-16'} bg-surface`}>
         <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
           
           {/* Header Summary Box */}
@@ -443,7 +501,7 @@ export default function SkillMapPage() {
             {/* Drawer Action Button */}
             <div className="pt-6 mt-6 border-t border-surface-container flex flex-col gap-2">
               <Link
-                href={`/analyses/${analysisId}/gap/${activeDrawerSkill.id}`}
+                href={isFacultyMode ? `/analyses/${analysisId}/gap/${activeDrawerSkill.id}?view=faculty` : `/analyses/${analysisId}/gap/${activeDrawerSkill.id}`}
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs transition-colors shadow-sm"
               >
                 <span>Add targeted fix to roadmap</span>
@@ -454,7 +512,7 @@ export default function SkillMapPage() {
         </div>
       )}
 
-      <MobileTabBar role="student" />
+      <MobileTabBar role={isFacultyMode ? 'coordinator' : 'student'} />
     </div>
   );
 }

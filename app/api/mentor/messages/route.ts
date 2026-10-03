@@ -20,12 +20,24 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const analysisId = searchParams.get('analysisId');
-
-    if (!analysisId) {
-      return NextResponse.json({ error: 'Missing analysisId parameter.' }, { status: 400 });
-    }
+    const all = searchParams.get('all');
 
     const supabase = await getSupabase();
+
+    // If all=true or no specific analysisId, return recent messages for faculty inbox
+    if (all === 'true' || !analysisId) {
+      const { data: messages, error } = await supabase
+        .from('mentor_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return NextResponse.json({ messages: [], chatStatus: 'open' });
+      }
+
+      return NextResponse.json({ messages: messages || [], chatStatus: 'open' });
+    }
+
     const { data: messages, error } = await supabase
       .from('mentor_messages')
       .select('*')
@@ -37,13 +49,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ messages: [], chatStatus: 'open' });
     }
 
-    // Determine chat status: if only student messages exist and no mentor reply, status is 'waiting'
     const allMessages = messages || [];
+
+    // Chat is unlocked if any real mentor has replied (ignoring automated wait messages)
     const hasMentorReply = allMessages.some(
       (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
     );
     const hasStudentMessage = allMessages.some((m: any) => m.sender === 'student');
-    const chatStatus = hasStudentMessage && !hasMentorReply ? 'waiting_for_mentor' : 'open';
+
+    // Only waiting if student initiated and mentor hasn't replied yet
+    const chatStatus = (hasStudentMessage && !hasMentorReply) ? 'waiting_for_mentor' : 'open';
 
     return NextResponse.json({ messages: allMessages, chatStatus });
   } catch (err: any) {
@@ -62,28 +77,19 @@ export async function POST(request: NextRequest) {
 
     const supabase = await getSupabase();
 
-    // If student is sending and chat is in waiting state, block further student messages
-    if (sender === 'student' || !sender) {
-      const { data: existingMessages } = await supabase
-        .from('mentor_messages')
-        .select('sender, message_text')
-        .eq('analysis_id', analysisId)
-        .order('created_at', { ascending: true });
+    // Check existing messages in this thread
+    const { data: existingMessages } = await supabase
+      .from('mentor_messages')
+      .select('sender, message_text')
+      .eq('analysis_id', analysisId)
+      .order('created_at', { ascending: true });
 
-      const msgs = existingMessages || [];
-      const hasStudentMessage = msgs.some((m: any) => m.sender === 'student');
-      const hasMentorReply = msgs.some(
-        (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
-      );
+    const msgs = existingMessages || [];
+    const hasMentorReply = msgs.some(
+      (m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait')
+    );
 
-      // If student already sent a message and mentor hasn't replied yet, block
-      if (hasStudentMessage && !hasMentorReply) {
-        return NextResponse.json({
-          error: 'Please wait for your mentor to respond before sending another message.',
-          chatStatus: 'waiting_for_mentor',
-        }, { status: 429 });
-      }
-    }
+    const isStudent = sender === 'student' || !sender;
 
     const id = 'msg_' + Math.random().toString(36).substring(2, 9);
 
@@ -109,8 +115,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If sent by student, send the automated "please wait" acknowledgment
-    if (sender === 'student' || !sender) {
+    // If sent by student
+    if (isStudent) {
+      // If mentor has already joined and sent a message, KEEP CHAT OPEN and do NOT insert waiting message
+      if (hasMentorReply) {
+        return NextResponse.json({
+          success: true,
+          message: data,
+          chatStatus: 'open',
+        });
+      }
+
+      // Initial inquiry: insert polite system acknowledgment
       const ackId = 'msg_sys_' + Math.random().toString(36).substring(2, 9);
       const ackMessage = {
         id: ackId,
@@ -131,13 +147,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If sent by mentor, the chat is now open for two-way conversation
+    // If sent by mentor: conversation is fully unlocked
     return NextResponse.json({
       success: true,
       message: data,
       chatStatus: 'open',
     });
   } catch (err: any) {
+    console.error('Mentor messages POST error:', err);
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
   }
 }

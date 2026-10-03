@@ -246,6 +246,34 @@ export async function POST(request: NextRequest) {
       console.warn('Roadmap items insert warning:', e);
     }
 
+    // 12b. Auto-assign Department Faculty Mentor if not already assigned
+    try {
+      const { data: existingAssign } = await supabase
+        .from('mentor_assignments')
+        .select('id')
+        .eq('student_id', effectiveUserId)
+        .single();
+
+      if (!existingAssign) {
+        // Map to real DB faculty mentors based on role/branch
+        const roleLower = (dreamRole || '').toLowerCase();
+        const assignedMentorId = (roleLower.includes('embedded') || roleLower.includes('hardware') || roleLower.includes('vlsi') || roleLower.includes('robotics') || roleLower.includes('core'))
+          ? 'fac_core_03' // Prof. Vikram Mehta
+          : (roleLower.includes('civil') || roleLower.includes('structural') || roleLower.includes('bim'))
+          ? 'fac_dean_01' // Prof. K. R. Sharma
+          : 'fac_cs_02'; // Dr. Sunita Rao (CSE/ISE/Software)
+
+        await supabase.from('mentor_assignments').insert({
+          id: 'assign_' + Math.random().toString(36).substring(2, 9),
+          student_id: effectiveUserId,
+          mentor_id: assignedMentorId,
+          assigned_by: 'Placement Cell Auto-Dispatch',
+        });
+      }
+    } catch (e) {
+      console.warn('Mentor assignment notice:', e);
+    }
+
     // 13. Set user id cookie for persistent session tracking
     const response = NextResponse.json({
       success: true,

@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { getSession, saveSession, clearSession, UserProfile } from '@/lib/auth';
 
 export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -16,7 +17,7 @@ export default function TopNav() {
     if (session) {
       setUser(session);
     } else {
-      // Default to student if inspecting directly
+      // Default fallback
       setUser({
         id: 'usr_student_01',
         name: 'Ananya Reddy',
@@ -34,7 +35,14 @@ export default function TopNav() {
     router.push('/');
   };
 
-  const isCoordinator = user?.role === 'coordinator' || pathname.startsWith('/tpc');
+  const isFacultyParam = searchParams?.get('view') === 'faculty';
+  const isCoordinator =
+    user?.role === 'coordinator' ||
+    user?.role === 'admin' ||
+    user?.role === 'mentor' ||
+    pathname.startsWith('/tpc') ||
+    pathname.startsWith('/mentor') ||
+    isFacultyParam;
 
   const handleToggleRole = () => {
     setMenuOpen(false);
@@ -90,7 +98,7 @@ export default function TopNav() {
               <span className="font-mono uppercase px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface border border-surface-variant">
                 Placement Cell
               </span>
-              <span className="text-on-surface-variant font-mono">Institutional Portal • AY 2024-25</span>
+              <span className="text-on-surface-variant font-mono">Faculty & Intervention Portal</span>
             </div>
           )}
         </div>
@@ -125,14 +133,14 @@ export default function TopNav() {
               {user?.name || 'User'}
             </span>
             <span className="font-mono text-[11px] text-on-surface-variant">
-              {isCoordinator ? 'TPC Incharge' : (user?.rollNumber ? `Candidate #${user.rollNumber}` : 'Student')}
+              {isCoordinator ? 'Faculty Reviewer' : (user?.rollNumber ? `Candidate #${user.rollNumber}` : 'Student')}
             </span>
           </div>
 
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="relative flex items-center justify-center p-0.5 rounded-full border border-surface-variant hover:ring-2 hover:ring-primary/20 transition-all focus:outline-none"
+              className="relative flex items-center justify-center p-0.5 rounded-full border border-surface-variant hover:ring-2 hover:ring-primary/20 transition-all focus:outline-none cursor-pointer"
               title="Account options"
             >
               <img
@@ -158,7 +166,7 @@ export default function TopNav() {
 
                 <button
                   onClick={handleToggleRole}
-                  className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left"
+                  className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                   <span>Switch to {isCoordinator ? 'Student View' : 'Coordinator View'}</span>
@@ -166,7 +174,7 @@ export default function TopNav() {
 
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center gap-2 w-full p-2 text-error hover:bg-error-container/30 rounded-lg transition-colors text-left font-medium mt-1 border-t border-surface-container"
+                  className="flex items-center gap-2 w-full p-2 text-error hover:bg-error-container/30 rounded-lg transition-colors text-left font-medium mt-1 border-t border-surface-container cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">logout</span>
                   <span>Sign out</span>
