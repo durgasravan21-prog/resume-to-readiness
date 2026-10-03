@@ -123,15 +123,13 @@ export default function MentorConsolePage() {
 
         setAvailableMentors(mapped);
 
-        // If current session is a faculty/admin user, default to their profile
-        if (session?.id && mapped.some((m) => m.id === session.id)) {
-          setActiveMentorFilter(session.id);
-        }
+        // Default to 'all' so consolidated view of all cohort consultations is visible
+        setActiveMentorFilter('all');
       }
     } catch (e) {
       console.warn('Error loading mentors from DB:', e);
     }
-  }, [session?.id, supabase]);
+  }, [supabase]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -154,11 +152,16 @@ export default function MentorConsolePage() {
       const candidates: StudentCandidate[] = [];
 
       for (const stProfile of profiles) {
-        if (stProfile.role === 'coordinator' || stProfile.role === 'admin' || stProfile.id === 'system') continue;
+        // Exclude system accounts and non-candidate faculty accounts
+        if (stProfile.id === 'system' || stProfile.id === 'usr_coord_01' || stProfile.id === 'fac_cs_02' || stProfile.id === 'fac_core_03' || stProfile.id === 'fac_dean_01') {
+          continue;
+        }
 
-        const analysis = analyses.find((a: any) => a.user_id === stProfile.id) ||
-                         analyses.find((a: any) => a.id === `ans_${stProfile.id.replace('usr_', '')}`) ||
-                         analyses[0];
+        // Find candidate analyses (sorted newest first)
+        const userAnalyses = analyses.filter((a: any) => a.user_id === stProfile.id);
+        const latestAnalysis = userAnalyses.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ||
+          analyses.find((a: any) => a.id === `ans_${stProfile.id.replace('usr_', '')}`) ||
+          analyses[0];
 
         const assignment = assignments.find((m: any) => m.student_id === stProfile.id);
         const defaultMentorId = (stProfile.branch?.includes('Electronics') || stProfile.branch?.includes('Mechanical'))
@@ -168,28 +171,49 @@ export default function MentorConsolePage() {
           : 'fac_cs_02';
 
         const mentorId = assignment?.mentor_id || defaultMentorId;
-        const mentorObj = availableMentors.find((m) => m.id === mentorId) || availableMentors[0] || {
+        const mentorObj = availableMentors.find((m) => m.id === mentorId) || availableMentors.find((m) => m.id === 'fac_cs_02') || {
           id: mentorId,
           name: 'Dr. Sunita Rao',
           email: 'cs.placement@nie.ac.in',
-          department: 'Computer Science',
-          role: 'Faculty Coordinator',
+          department: 'Computer Science & Engineering',
+          role: 'Faculty Coordinator (CSE / ISE)',
         };
 
-        const effectiveAnalysisId = analysis?.id || `ans_${stProfile.id}`;
+        const effectiveAnalysisId = latestAnalysis?.id || `ans_${stProfile.id}`;
 
-        // Check messages for this student/analysis
-        const studentMessages = messages.filter((m: any) => m.analysis_id === effectiveAnalysisId);
-        const studentSentMsg = studentMessages.find((m: any) => m.sender === 'student');
-        const mentorReplied = studentMessages.some((m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait'));
+        // Collect all related analysis IDs for this student
+        const relatedAnalysisIds = userAnalyses.map((a: any) => a.id);
+        if (!relatedAnalysisIds.includes(effectiveAnalysisId)) relatedAnalysisIds.push(effectiveAnalysisId);
+        if (stProfile.id === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee') {
+          relatedAnalysisIds.push('ans_7s4yk27');
+          relatedAnalysisIds.push('ans_durga_01');
+          relatedAnalysisIds.push('default');
+        }
+
+        // Check messages for this student across all their consultation threads
+        const studentMessages = messages.filter((m: any) =>
+          relatedAnalysisIds.includes(m.analysis_id) || m.user_id === stProfile.id
+        ).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        const lastStudentMsg = studentMessages.find((m: any) => m.sender === 'student');
+        const lastMentorMsg = studentMessages.find((m: any) => m.sender === 'mentor' && !m.message_text?.includes('Please wait'));
+
+        let isWaiting = false;
+        if (lastStudentMsg) {
+          if (!lastMentorMsg) {
+            isWaiting = true;
+          } else {
+            isWaiting = new Date(lastStudentMsg.created_at).getTime() > new Date(lastMentorMsg.created_at).getTime();
+          }
+        }
 
         let pendingMessage: any = undefined;
-        if (studentSentMsg) {
+        if (lastStudentMsg) {
           pendingMessage = {
-            id: studentSentMsg.id,
-            text: studentSentMsg.message_text,
-            time: new Date(studentSentMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            waiting: !mentorReplied,
+            id: lastStudentMsg.id,
+            text: lastStudentMsg.message_text,
+            time: new Date(lastStudentMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            waiting: isWaiting,
           };
         }
 
@@ -199,10 +223,10 @@ export default function MentorConsolePage() {
           rollNumber: stProfile.roll_number || '4NI21CS' + Math.floor(10 + Math.random() * 89),
           branch: stProfile.branch || 'Computer Science & Engineering',
           cgpa: stProfile.cgpa || '8.2',
-          targetRole: analysis?.dream_role || 'Software Development Engineer',
-          targetCompany: analysis?.dream_company || 'Placement Drive Benchmark',
-          readinessScore: analysis?.readiness_score || 74,
-          confidenceScore: analysis?.confidence_score || 85,
+          targetRole: latestAnalysis?.dream_role || 'Software Development Engineer',
+          targetCompany: latestAnalysis?.dream_company || 'Placement Drive Benchmark',
+          readinessScore: latestAnalysis?.readiness_score || 74,
+          confidenceScore: latestAnalysis?.confidence_score || 85,
           analysisId: effectiveAnalysisId,
           mentorId,
           mentorName: mentorObj.name,
@@ -212,10 +236,16 @@ export default function MentorConsolePage() {
 
       setStudents(candidates);
 
-      // Select first student for inbox if not already selected
-      if (!selectedStudentForChat && candidates.length > 0) {
-        const waitingOne = candidates.find((c) => c.pendingMessage?.waiting) || candidates[0];
-        setSelectedStudentForChat(waitingOne);
+      // Select student with waiting message first, or first candidate
+      if (candidates.length > 0) {
+        setSelectedStudentForChat((prev) => {
+          if (prev) {
+            const updated = candidates.find((c) => c.id === prev.id);
+            if (updated) return updated;
+          }
+          const waitingOne = candidates.find((c) => c.pendingMessage?.waiting) || candidates[0];
+          return waitingOne;
+        });
       }
     } catch (e) {
       console.warn('Error loading mentor data:', e);
@@ -264,7 +294,8 @@ export default function MentorConsolePage() {
   }, [allMessages, selectedStudentForChat]);
 
   // Filter students based on selected faculty persona
-  const displayedStudents = activeMentorFilter === 'all'
+  // If Lead Administrator (Durga) is selected or All Mentors, show all candidates
+  const displayedStudents = (activeMentorFilter === 'all' || activeMentorFilter === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee')
     ? students
     : students.filter((s) => s.mentorId === activeMentorFilter);
 
@@ -272,13 +303,13 @@ export default function MentorConsolePage() {
 
   // Active mentor object for sending messages
   const currentActiveMentor = availableMentors.find((m) => m.id === activeMentorFilter) ||
-    availableMentors.find((m) => m.id === session?.id) ||
+    availableMentors.find((m) => m.id === 'fac_cs_02') ||
     availableMentors[0] || {
-      id: '36ac8503-c1c5-4865-b3f5-51c302a3e1ee',
-      name: session?.name || 'Durga sravan Challagolla',
-      email: session?.email || 'durgasravan21@gmail.com',
-      department: 'Training & Placement Lead',
-      role: 'Lead Placement Administrator',
+      id: 'fac_cs_02',
+      name: 'Dr. Sunita Rao',
+      email: 'cs.placement@nie.ac.in',
+      department: 'Computer Science & Engineering',
+      role: 'Faculty Coordinator (CSE / ISE)',
     };
 
   // Handle Quick Reply Submission
@@ -288,11 +319,15 @@ export default function MentorConsolePage() {
 
     setReplySubmitting(true);
     try {
+      const targetAnalysisId = selectedStudentForReply.pendingMessage?.id
+        ? (allMessages.find((m) => m.id === selectedStudentForReply.pendingMessage?.id)?.analysis_id || selectedStudentForReply.analysisId)
+        : selectedStudentForReply.analysisId;
+
       const res = await fetch('/api/mentor/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analysisId: selectedStudentForReply.analysisId,
+          analysisId: targetAnalysisId,
           userId: currentActiveMentor.id,
           sender: 'mentor',
           senderName: currentActiveMentor.name,
@@ -321,11 +356,15 @@ export default function MentorConsolePage() {
 
     setInboxSending(true);
     try {
+      const targetAnalysisId = selectedStudentForChat.pendingMessage?.id
+        ? (allMessages.find((m) => m.id === selectedStudentForChat.pendingMessage?.id)?.analysis_id || selectedStudentForChat.analysisId)
+        : selectedStudentForChat.analysisId;
+
       const res = await fetch('/api/mentor/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analysisId: selectedStudentForChat.analysisId,
+          analysisId: targetAnalysisId,
           userId: currentActiveMentor.id,
           sender: 'mentor',
           senderName: currentActiveMentor.name,
@@ -335,7 +374,7 @@ export default function MentorConsolePage() {
 
       if (!res.ok) throw new Error('Failed to send reply');
 
-      setToastMessage(`Reply sent to ${selectedStudentForChat.name}. Student chat unlocked.`);
+      setToastMessage(`Reply sent as ${currentActiveMentor.name} to ${selectedStudentForChat.name}. Student chat unlocked.`);
       setInboxReplyText('');
       loadData();
       setTimeout(() => setToastMessage(null), 3000);
@@ -381,10 +420,17 @@ export default function MentorConsolePage() {
     }
   };
 
-  // Filter messages for selected student in inbox
+  // Filter messages for selected student in inbox across all threads
   const activeConversationMessages = selectedStudentForChat
     ? allMessages
-        .filter((m) => m.analysis_id === selectedStudentForChat.analysisId)
+        .filter((m) => {
+          if (m.analysis_id === selectedStudentForChat.analysisId) return true;
+          if (m.user_id === selectedStudentForChat.id) return true;
+          if (selectedStudentForChat.id === '36ac8503-c1c5-4865-b3f5-51c302a3e1ee') {
+            return m.analysis_id === 'ans_7s4yk27' || m.analysis_id === 'ans_durga_01' || m.analysis_id === 'default';
+          }
+          return false;
+        })
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     : [];
 
