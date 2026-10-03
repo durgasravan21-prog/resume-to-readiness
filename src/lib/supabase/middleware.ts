@@ -47,9 +47,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.includes('.');
 
   const demoRole = request.cookies.get('readiness_role')?.value;
-  const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
-  if (!user && demoRole && isDemoMode) {
+  if (!user && demoRole) {
     const role = demoRole;
     if (pathname === '/') {
       if (role === 'student') return NextResponse.redirect(new URL('/home', request.url));
@@ -57,7 +56,7 @@ export async function updateSession(request: NextRequest) {
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));
       if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
     }
-    if (pathname.startsWith('/home') || pathname.startsWith('/analyses')) {
+    if (pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/onboarding')) {
       if (role !== 'student' && role !== 'admin') {
         return NextResponse.redirect(new URL(role === 'coordinator' ? '/tpc' : '/mentor', request.url));
       }
@@ -80,7 +79,7 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  if (!user && !isPublicPath) {
+  if (!user && !demoRole && !isPublicPath) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

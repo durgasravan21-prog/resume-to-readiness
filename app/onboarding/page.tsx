@@ -60,17 +60,68 @@ export default function OnboardingPage() {
   // Consent
   const [consentAgreed, setConsentAgreed] = useState(false);
 
-  // Initialize from session if available
+  const DRAFT_KEY = 'readiness_onboarding_draft';
+  const RESUME_KEY = 'readiness_resume_cache';
+
+  // Load saved draft and restore state on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. Try restoring from draft
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.step) setStep(d.step);
+        if (d.name) setName(d.name);
+        if (d.rollNumber) setRollNumber(d.rollNumber);
+        if (d.school10th) setSchool10th(d.school10th);
+        if (d.school10thMarks) setSchool10thMarks(d.school10thMarks);
+        if (d.school12th) setSchool12th(d.school12th);
+        if (d.school12thMarks) setSchool12thMarks(d.school12thMarks);
+        if (d.collegeName) setCollegeName(d.collegeName);
+        if (d.degree) setDegree(d.degree);
+        if (d.branch) setBranch(d.branch);
+        if (d.graduationYear) setGraduationYear(d.graduationYear);
+        if (d.cgpa) setCgpa(d.cgpa);
+        if (d.achievements) setAchievements(d.achievements);
+        if (d.selectedRoleId) setSelectedRoleId(d.selectedRoleId);
+        if (d.customRoleTitle) setCustomRoleTitle(d.customRoleTitle);
+        if (d.dreamCompany) setDreamCompany(d.dreamCompany);
+        if (d.consentAgreed !== undefined) setConsentAgreed(d.consentAgreed);
+      }
+    } catch (e) {
+      console.warn('Could not restore draft:', e);
+    }
+
+    // 2. Try restoring cached resume file
+    try {
+      const cachedResume = sessionStorage.getItem(RESUME_KEY);
+      if (cachedResume) {
+        const { name: fName, type: fType, data: fData } = JSON.parse(cachedResume);
+        const byteCharacters = atob(fData);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: fType });
+        const restored = new File([blob], fName, { type: fType });
+        setFile(restored);
+      }
+    } catch (e) {
+      console.warn('Could not restore resume from session cache:', e);
+    }
+
     const session = getSession();
     if (session) {
-      if (session.name) setName(session.name);
-      if (session.rollNumber) setRollNumber(session.rollNumber);
-      if (session.degree) setDegree(session.degree);
-      if (session.branch) setBranch(session.branch);
-      if (session.graduationYear) setGraduationYear(session.graduationYear);
-      if (session.cgpa) setCgpa(session.cgpa);
-      if (session.collegeName) setCollegeName(session.collegeName);
+      setName((prev) => prev || session.name || '');
+      setRollNumber((prev) => prev || session.rollNumber || '');
+      setDegree((prev) => prev || session.degree || 'B.Tech');
+      setBranch((prev) => prev || session.branch || 'Computer Science & Engineering');
+      setGraduationYear((prev) => prev || session.graduationYear || '2025');
+      setCgpa((prev) => prev || session.cgpa || '8.45');
+      setCollegeName((prev) => prev || session.collegeName || 'National Institute of Engineering');
     }
 
     // Fetch target roles uploaded by placement coordinator
@@ -79,7 +130,7 @@ export default function OnboardingPage() {
       .then((data) => {
         if (data.roles && data.roles.length > 0) {
           setRoles(data.roles);
-          setSelectedRoleId(data.roles[0].id);
+          setSelectedRoleId((prev) => prev || data.roles[0].id);
         }
       })
       .catch((e) => console.warn('Could not load roles:', e))
@@ -94,13 +145,58 @@ export default function OnboardingPage() {
       .catch((e) => console.warn('Could not load companies:', e));
   }, []);
 
+  // Persist form draft whenever step or inputs change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const draft = {
+      step,
+      name,
+      rollNumber,
+      school10th,
+      school10thMarks,
+      school12th,
+      school12thMarks,
+      collegeName,
+      degree,
+      branch,
+      graduationYear,
+      cgpa,
+      achievements,
+      selectedRoleId,
+      customRoleTitle,
+      dreamCompany,
+      consentAgreed,
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {}
+  }, [
+    step,
+    name,
+    rollNumber,
+    school10th,
+    school10thMarks,
+    school12th,
+    school12thMarks,
+    collegeName,
+    degree,
+    branch,
+    graduationYear,
+    cgpa,
+    achievements,
+    selectedRoleId,
+    customRoleTitle,
+    dreamCompany,
+    consentAgreed,
+  ]);
+
   const handleFileChange = (incoming: File | null) => {
     setErrorMessage(null);
     if (!incoming) return;
 
     const ext = incoming.name.substring(incoming.name.lastIndexOf('.')).toLowerCase();
-    if (ext !== '.pdf' && ext !== '.docx') {
-      setErrorMessage('Please upload a PDF (.pdf) or Word document (.docx).');
+    if (ext !== '.pdf' && ext !== '.docx' && ext !== '.doc') {
+      setErrorMessage('Please upload a PDF (.pdf) or Word document (.docx, .doc).');
       return;
     }
     if (incoming.size > 5 * 1024 * 1024) {
@@ -108,6 +204,25 @@ export default function OnboardingPage() {
       return;
     }
     setFile(incoming);
+
+    // Cache file in sessionStorage as base64 for page refresh resilience
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        sessionStorage.setItem(
+          RESUME_KEY,
+          JSON.stringify({
+            name: incoming.name,
+            type: incoming.type,
+            data: base64,
+          })
+        );
+      };
+      reader.readAsDataURL(incoming);
+    } catch (e) {
+      console.warn('Could not cache file to session:', e);
+    }
   };
 
   const selectedRoleObj = roles.find((r) => r.id === selectedRoleId);
@@ -174,6 +289,14 @@ export default function OnboardingPage() {
         role: 'student',
         collegeName: profilePayload.college_name,
       });
+
+      // Clear temporary onboarding cache on successful submission
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(DRAFT_KEY);
+          sessionStorage.removeItem(RESUME_KEY);
+        } catch (e) {}
+      }
 
       // Route directly to waiting analysis screen
       router.push(`/analyses/waiting/${data.analysisId}`);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
@@ -101,10 +101,27 @@ export default function RoadmapPage() {
 
   const [tasks, setTasks] = useState<RoadmapTask[]>(INITIAL_TASKS);
 
+  // Restore task progress on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem(`readiness_roadmap_${analysisId}`);
+      if (saved) {
+        setTasks(JSON.parse(saved));
+      }
+    } catch (e) {}
+  }, [analysisId]);
+
   const toggleTask = (taskId: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
-    );
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`readiness_roadmap_${analysisId}`, JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
   };
 
   const completedCount = tasks.filter((t) => t.done).length;
