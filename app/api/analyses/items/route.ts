@@ -46,7 +46,7 @@ export async function PATCH(request: NextRequest) {
       .update(updateFields)
       .eq('id', itemId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (itemError) {
       console.error('Error updating competency item:', itemError);
