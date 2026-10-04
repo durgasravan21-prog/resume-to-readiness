@@ -19,6 +19,9 @@ import {
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
+  Target,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 
 export default function SignupPage() {
@@ -138,9 +141,71 @@ export default function SignupPage() {
         </div>
       </header>
 
-      {/* Main Registration Form */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <div className="w-full max-w-lg bg-surface-container-low border border-surface-variant rounded-2xl shadow-sm p-6 sm:p-8">
+      {/* Main Content Area: 2-Column Split Hero with Vision */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 lg:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* Left Column: Vision & Platform Purpose */}
+        <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono font-medium mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-secondary" />
+              <span>Placement Preparation Network</span>
+            </div>
+            <h1 className="font-headline text-3xl sm:text-4xl font-bold text-primary tracking-tight leading-tight">
+              Join the Placement Readiness Network
+            </h1>
+            <p className="font-body text-sm sm:text-base text-on-surface-variant mt-3 leading-relaxed">
+              Every year, thousands of qualified students miss campus placement offers due to lack of feedback. Readiness provides you with line-by-line rubric diagnostics, customizable weekly sprints, and active mentorship from your college faculty.
+            </p>
+          </div>
+
+          {/* Student Photo Card with Mission Quote */}
+          <div className="relative rounded-2xl overflow-hidden border border-surface-variant shadow-sm bg-surface-container-low group">
+            <img
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5L6b4t8MKW9JRAz6qAw6cRvnO6ne5h4e-r9zwqUoqcXCxYRQWOKOBbl-4NRL_T1NdWbVEiGRNlk4t0DuB5Bz7Y3FPt-mAZSGI1AvGpXROx23lOWgoUmV0sk2yhLLeMwwEarsCU8RD5SyLAOB_x98F0f3OjkSQgDU_fEqIfJ7oOpL21mL-SeB337uiQ6SWQV436L7eL9a_2Q9R_cfl66TH31KMpywI__hLV-xnhVoU-w8Qtbb0LB9cyg"
+              alt="Indian engineering student in sunlit university campus corridor"
+              className="w-full h-52 sm:h-60 object-cover object-top"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/40 to-transparent flex flex-col justify-end p-5 text-on-primary">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-fixed font-semibold">
+                Our Mission
+              </span>
+              <p className="font-headline text-sm sm:text-base font-medium leading-snug mt-1">
+                "Turning student ambition into verifiable engineering proof before campus placement season begins."
+              </p>
+            </div>
+          </div>
+
+          {/* Core Benefits */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-container-low border border-surface-variant">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                <Target className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-headline text-xs font-semibold text-primary">Granular Diagnostic Rubric</h4>
+                <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                  Know whether each requirement is Strong, Needs Proof, or Missing.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-container-low border border-surface-variant">
+              <div className="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-headline text-xs font-semibold text-primary">Sequential Preparation Sprints</h4>
+                <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                  Follow structured 6-week preparation milestones targeted to your role.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Registration Card */}
+        <div className="lg:col-span-7 flex justify-center w-full">
+          <div className="w-full max-w-lg bg-surface-container-low border border-surface-variant rounded-2xl shadow-sm p-6 sm:p-8">
           {/* Header */}
           <div className="mb-6 text-center">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary mb-3">
@@ -396,7 +461,8 @@ export default function SignupPage() {
             </Link>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
 
       {/* Footer */}
       <footer className="border-t border-surface-variant py-4 px-6 text-center text-[11px] text-on-surface-variant font-mono">

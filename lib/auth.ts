@@ -86,7 +86,8 @@ export async function signOutUser() {
       console.warn('Signout API call notice:', e);
     }
     clearSession();
-    window.location.href = '/login';
+    // Replace history entry so pressing browser Back cannot return to protected session
+    window.location.replace('/login');
   }
 }
 

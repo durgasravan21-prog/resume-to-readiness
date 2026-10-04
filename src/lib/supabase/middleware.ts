@@ -87,7 +87,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user && !demoRole && !isPublicPath) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
+    redirectResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    redirectResponse.headers.set('Pragma', 'no-cache');
+    redirectResponse.headers.set('Expires', '0');
+    return redirectResponse;
   }
 
   if (user) {
@@ -160,6 +164,12 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(new URL('/home', request.url));
       }
     }
+  }
+
+  if (!isPublicPath) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
   }
 
   return response;

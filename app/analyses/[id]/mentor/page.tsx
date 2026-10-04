@@ -64,6 +64,7 @@ export default function MentorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_WELCOME]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [isMentorTyping, setIsMentorTyping] = useState(false);
   const [chatStatus, setChatStatus] = useState<'open' | 'waiting_for_mentor'>('open');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +192,7 @@ export default function MentorPage() {
 
     setSending(true);
     if (!textToSend) setInputValue('');
+    if (!isFacultyMode) setIsMentorTyping(true);
 
     const senderType = isFacultyMode ? 'mentor' : 'student';
     const senderName = isFacultyMode
@@ -223,6 +225,18 @@ export default function MentorPage() {
 
       const data = await res.json();
 
+      if (data.reply) {
+        setTimeout(() => {
+          setIsMentorTyping(false);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === data.reply.id)) return prev;
+            return [...prev, data.reply];
+          });
+        }, 600);
+      } else {
+        setIsMentorTyping(false);
+      }
+
       if (data.chatStatus) {
         setChatStatus(data.chatStatus);
       }
@@ -232,9 +246,10 @@ export default function MentorPage() {
         setChatStatus('open');
       }
 
-      setTimeout(fetchMessages, 400);
+      setTimeout(fetchMessages, 800);
     } catch (err) {
       console.error('Network error sending message:', err);
+      setIsMentorTyping(false);
     } finally {
       setSending(false);
     }
@@ -387,6 +402,21 @@ export default function MentorPage() {
                   <p className="text-[11px] text-on-surface-variant mt-1">
                     Your consultation query has been logged. Messaging will resume once your mentor replies.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Live Typing Indicator */}
+            {isMentorTyping && (
+              <div className="flex flex-col items-start space-y-1">
+                <span className="text-[11px] font-mono text-on-surface-variant font-medium">
+                  {mentorName} (Placement Mentor)
+                </span>
+                <div className="rounded-2xl p-3 bg-surface-container-high border border-outline-variant/30 rounded-tl-none flex items-center gap-1.5 text-xs text-on-surface-variant">
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce [animation-delay:0.4s]"></span>
+                  <span className="font-mono text-[11px] ml-1">Formulating placement advice...</span>
                 </div>
               </div>
             )}

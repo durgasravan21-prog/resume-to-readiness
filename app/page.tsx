@@ -772,6 +772,75 @@ export default function WelcomePage() {
         </div>
       </section>
 
+      {/* Vision & Manifesto Section */}
+      <section className="border-t border-surface-container-highest bg-surface py-16 px-6 lg:px-12">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <span className="font-mono text-xs uppercase tracking-wider text-secondary font-semibold">
+              Our Vision & Philosophy
+            </span>
+            <h2 className="font-headline text-3xl sm:text-4xl font-semibold text-primary mt-2 mb-4 leading-tight">
+              Bridging the Academic-Industry Divide with Absolute Transparency
+            </h2>
+            <p className="font-body text-sm sm:text-base text-on-surface-variant leading-relaxed">
+              In universities across the country, brilliant engineering students face campus recruitment drives after four years of rigorous study. Yet over 80% struggle during technical interviews. The issue is never talent — it is the absence of transparent rubrics and practical hiring proof.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-xs">
+              <span className="font-mono text-xs font-bold text-secondary uppercase tracking-wider block mb-2">
+                01. Clarity Over Obscurity
+              </span>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Explainable Diagnosis
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                No opaque percentages or AI guesswork. If marks are deducted, students receive exact citations from their resume and concrete instructions on what evidence was missing.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-xs">
+              <span className="font-mono text-xs font-bold text-secondary uppercase tracking-wider block mb-2">
+                02. Proof Over Buzzwords
+              </span>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Verifiable Engineering
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Recruiters disregard keyword stuffing. We guide students to build live deployed features, test suites, and clean architecture that stand up to recruiter scrutiny.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-xs">
+              <span className="font-mono text-xs font-bold text-secondary uppercase tracking-wider block mb-2">
+                03. Institutional Partnership
+              </span>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Faculty & TPC Synergy
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Placement officers track cohort heatmaps while departmental faculty provide real-time mentorship, aligning the entire institution toward 100% placement readiness.
+              </p>
+            </div>
+          </div>
+
+          {/* Vision Quote Banner */}
+          <div className="p-8 rounded-2xl bg-primary text-on-primary border border-primary-container relative overflow-hidden shadow-sm">
+            <div className="relative z-10 max-w-3xl">
+              <p className="font-headline text-lg sm:text-xl font-medium leading-relaxed italic mb-4">
+                "Campus recruitment shouldn't be a lottery. When students have crystal-clear feedback, verified benchmarks, and structured weekly sprints, placement readiness becomes inevitable."
+              </p>
+              <div className="flex items-center gap-3 font-mono text-xs text-on-primary/90">
+                <span className="font-semibold text-secondary-fixed">Durga Sravan Challagolla</span>
+                <span>•</span>
+                <span>Platform Lead & Engineering Placement Initiative</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Editorial Footer */}
       <footer className="px-6 lg:px-12 py-4 border-t border-surface-container-highest text-xs font-mono text-on-surface-variant flex flex-col sm:flex-row items-center justify-between gap-2">
         <span>Readiness · Skill Gap Diagnostic Platform</span>

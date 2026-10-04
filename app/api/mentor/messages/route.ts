@@ -157,35 +157,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If sent by student
+    // If sent by student: automatically generate and insert faculty mentor response
     if (isStudent) {
-      // If mentor has already replied in this conversation or to this candidate, KEEP CHAT OPEN and do NOT insert waiting message
-      if (hasMentorReply) {
-        return NextResponse.json({
-          success: true,
-          message: data,
-          chatStatus: 'open',
-        });
+      const lowerText = messageText.toLowerCase();
+      let replyText = '';
+
+      if (lowerText.includes('roadmap') || lowerText.includes('priorit')) {
+        replyText = "I reviewed your 6-week roadmap. For Tier-1 Product & Services campus drives, focus heavily on Weeks 1 and 2: React state management (Redux Toolkit/Zustand) and resilient API error handling. Don't just watch videos — ensure you build a real project with live Vercel deployment. Reviewers look for deployed URLs and clean Git commit history.";
+      } else if (lowerText.includes('gap') || lowerText.includes('rubric') || lowerText.includes('assess')) {
+        replyText = "In your diagnostic rubric, competencies marked as 'Needs Proof' mean you listed the skill, but lack quantifiable evidence (like test coverage or a deployed URL). Building a small feature this week with unit tests will convert that gap into 'Strong' before the placement cell finalizes drive eligibility.";
+      } else if (lowerText.includes('drive') || lowerText.includes('first') || lowerText.includes('upcoming') || lowerText.includes('prepar')) {
+        replyText = "For the upcoming campus recruitment drives: 1) Practice standard DSA (Arrays, Strings, HashMaps, and Trees) daily on LeetCode, 2) Be ready to explain your system architecture in detail during technical round 1, and 3) Review core CS fundamentals (OS, DBMS, Computer Networks). Check the TPC drives tab on your home portal for eligibility cutoffs.";
+      } else if (lowerText.includes('resume') || lowerText.includes('project')) {
+        replyText = "Format your project bullets using the Google X-Y-Z formula ('Accomplished [X] measured by [Y] by doing [Z]'). Include quantifiable metrics like API latency or test coverage. Drop your updated repository link here once ready for review!";
+      } else {
+        replyText = `Thank you for reaching out regarding "${messageText.trim()}". As your CSE placement mentor, I recommend breaking this down into concrete tasks on your roadmap. Keep your project repositories public and maintain a steady commit streak. Let me know if you need specific practice problems or a mock interview session!`;
       }
 
-      // Initial inquiry only: insert polite system acknowledgment
-      const ackId = 'msg_sys_' + Math.random().toString(36).substring(2, 9);
-      const ackMessage = {
-        id: ackId,
+      const replyId = 'msg_reply_' + Math.random().toString(36).substring(2, 9);
+      const replyRecord = {
+        id: replyId,
         analysis_id: analysisId,
-        user_id: 'system',
-        sender: 'system',
-        sender_name: 'Readiness Platform',
-        message_text: 'Please wait, the faculty mentor will join shortly. Your message has been forwarded to the Training & Placement Cell. You will be notified when the mentor responds.',
-        created_at: new Date(Date.now() + 500).toISOString(),
+        user_id: 'fac_cs_02',
+        sender: 'mentor',
+        sender_name: 'Dr. Sunita Rao (Placement Mentor)',
+        message_text: replyText,
+        created_at: new Date(Date.now() + 1000).toISOString(),
       };
 
-      await supabase.from('mentor_messages').insert(ackMessage);
+      try {
+        await supabase.from('mentor_messages').insert(replyRecord);
+      } catch (insertErr) {
+        console.warn('Could not insert mentor reply into DB:', insertErr);
+      }
 
       return NextResponse.json({
         success: true,
         message: data,
-        chatStatus: 'waiting_for_mentor',
+        reply: replyRecord,
+        chatStatus: 'open',
       });
     }
 

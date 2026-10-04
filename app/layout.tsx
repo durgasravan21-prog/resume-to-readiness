@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import QueryProvider from '@/components/providers/QueryProvider';
+import SessionGuard from '@/components/auth/SessionGuard';
 
 export const metadata: Metadata = {
   title: {
@@ -67,7 +68,10 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
       </head>
       <body className="bg-surface font-body text-on-surface antialiased min-h-screen">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <SessionGuard />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

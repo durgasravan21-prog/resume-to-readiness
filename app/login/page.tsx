@@ -18,6 +18,10 @@ import {
   Briefcase,
   Building2,
   Users,
+  Target,
+  TrendingUp,
+  Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -274,9 +278,77 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <div className="w-full max-w-md bg-surface-container-low border border-surface-variant rounded-2xl shadow-sm p-6 sm:p-8">
+      {/* Main Content Area: 2-Column Split Hero with Vision */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 lg:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* Left Column: Vision & Platform Purpose */}
+        <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono font-medium mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-secondary" />
+              <span>Our Vision for Placement Excellence</span>
+            </div>
+            <h1 className="font-headline text-3xl sm:text-4xl font-bold text-primary tracking-tight leading-tight">
+              Transforming Campus Placement Preparation
+            </h1>
+            <p className="font-body text-sm sm:text-base text-on-surface-variant mt-3 leading-relaxed">
+              We built Readiness to end the anxiety of campus placement drives. College curriculums teach theory, but tech recruiters test practical proof. We bridge that gap with transparent, rubric-backed diagnostics and sequential weekly sprints.
+            </p>
+          </div>
+
+          {/* Student Photo Card with Mission Quote */}
+          <div className="relative rounded-2xl overflow-hidden border border-surface-variant shadow-sm bg-surface-container-low group">
+            <img
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5L6b4t8MKW9JRAz6qAw6cRvnO6ne5h4e-r9zwqUoqcXCxYRQWOKOBbl-4NRL_T1NdWbVEiGRNlk4t0DuB5Bz7Y3FPt-mAZSGI1AvGpXROx23lOWgoUmV0sk2yhLLeMwwEarsCU8RD5SyLAOB_x98F0f3OjkSQgDU_fEqIfJ7oOpL21mL-SeB337uiQ6SWQV436L7eL9a_2Q9R_cfl66TH31KMpywI__hLV-xnhVoU-w8Qtbb0LB9cyg"
+              alt="Indian engineering student in sunlit university campus corridor"
+              className="w-full h-52 sm:h-60 object-cover object-top"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/40 to-transparent flex flex-col justify-end p-5 text-on-primary">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-fixed font-semibold">
+                Platform Vision
+              </span>
+              <p className="font-headline text-sm sm:text-base font-medium leading-snug mt-1">
+                "Campus drives shouldn't be a lottery. When students have crystal-clear feedback and structured weekly sprints, readiness becomes inevitable."
+              </p>
+            </div>
+          </div>
+
+          {/* 3 Core Value Pillars */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2">
+                <Target className="w-4 h-4" />
+              </div>
+              <h4 className="font-headline text-xs font-semibold text-primary">Role Rubrics</h4>
+              <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                Calibrated against Tier-1 Product & IT Services hiring criteria.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant">
+              <div className="w-7 h-7 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center mb-2">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <h4 className="font-headline text-xs font-semibold text-primary">Proof Citations</h4>
+              <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                Line-by-line evidence citations extracted directly from your resume.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <h4 className="font-headline text-xs font-semibold text-primary">6-Week Sprints</h4>
+              <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                Prioritized weekly roadmaps with code tasks and mentor guidance.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Sign In Card */}
+        <div className="lg:col-span-6 flex justify-center w-full">
+          <div className="w-full max-w-md bg-surface-container-low border border-surface-variant rounded-2xl shadow-sm p-6 sm:p-8">
           {/* Header */}
           <div className="mb-6 text-center">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary mb-3">
@@ -609,7 +681,8 @@ export default function LoginPage() {
             </Link>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
 
       {/* Footer */}
       <footer className="border-t border-surface-variant py-4 px-6 text-center text-[11px] text-on-surface-variant font-mono">
