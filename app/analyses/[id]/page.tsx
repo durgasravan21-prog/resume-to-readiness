@@ -53,6 +53,15 @@ export default function SkillMapPage() {
   const isFacultyMode = searchParams.get('view') === 'faculty' || cookieRole === 'coordinator';
 
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
+  const restrictedParam = searchParams?.get('restricted');
+  const [restrictedNotice, setRestrictedNotice] = useState<string | null>(restrictedParam || null);
+
+  useEffect(() => {
+    if (restrictedParam) {
+      setRestrictedNotice(restrictedParam);
+    }
+  }, [restrictedParam]);
+
   const [candidateProfile, setCandidateProfile] = useState<{ name: string; roll: string; branch: string } | null>(null);
   const [skillItems, setSkillItems] = useState<SkillItem[]>([]);
   const [activeDrawerSkill, setActiveDrawerSkill] = useState<SkillItem | null>(null);
@@ -326,6 +335,28 @@ export default function SkillMapPage() {
       <main className={`flex-1 w-full ${isFacultyMode ? 'pt-4' : 'pt-16'} bg-surface`}>
         <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
           
+          {/* Security Restriction Banner */}
+          {restrictedNotice && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start justify-between gap-3 text-amber-900 dark:text-amber-200">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0 mt-0.5">shield_lock</span>
+                <div>
+                  <h4 className="font-semibold text-sm">Access Restricted</h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    You are currently viewing student analyses. Access to the Training & Placement Cell coordinator dashboard (<code>/{restrictedNotice}</code>) is restricted.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRestrictedNotice(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg"
+                title="Dismiss"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+
           {/* Header Summary Box */}
           <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl p-6 sm:p-8 mb-8 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-baseline md:justify-between gap-3 mb-3">

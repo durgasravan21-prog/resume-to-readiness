@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileTabBar from '@/components/layout/MobileTabBar';
+import { getSession } from '@/lib/auth';
 
 interface RoleBenchmark {
   id: string;
@@ -19,10 +21,30 @@ interface RoleBenchmark {
 }
 
 export default function CoordinatorRolesPage() {
+  const router = useRouter();
   const [roles, setRoles] = useState<RoleBenchmark[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const session = getSession();
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
+    const effectiveRole = cookieRole || session?.role || 'student';
+
+    if (effectiveRole !== 'coordinator' && effectiveRole !== 'admin') {
+      const lastPath = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_last_student_path='))?.split('=')[1]
+        : null;
+      const target = (lastPath && lastPath.startsWith('/analyses'))
+        ? `${lastPath}${lastPath.includes('?') ? '&' : '?'}restricted=tpc`
+        : '/home?restricted=tpc';
+      router.replace(target);
+    }
+  }, [router]);
 
   // Form states
   const [title, setTitle] = useState('');

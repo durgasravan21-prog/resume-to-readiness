@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileTabBar from '@/components/layout/MobileTabBar';
+import { getSession } from '@/lib/auth';
 
 export default function CoordinatorSettingsPage() {
+  const router = useRouter();
   const [minCgpa, setMinCgpa] = useState('7.0');
   const [minReadiness, setMinReadiness] = useState('75');
   const [tier1Readiness, setTier1Readiness] = useState('80');
@@ -15,6 +18,25 @@ export default function CoordinatorSettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const session = getSession();
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
+    const effectiveRole = cookieRole || session?.role || 'student';
+
+    if (effectiveRole !== 'coordinator' && effectiveRole !== 'admin') {
+      const lastPath = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_last_student_path='))?.split('=')[1]
+        : null;
+      const target = (lastPath && lastPath.startsWith('/analyses'))
+        ? `${lastPath}${lastPath.includes('?') ? '&' : '?'}restricted=tpc`
+        : '/home?restricted=tpc';
+      router.replace(target);
+    }
+  }, [router]);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();

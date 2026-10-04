@@ -15,7 +15,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
     if (pathname.startsWith('/tpc') && role !== 'coordinator' && role !== 'admin') {
-      return NextResponse.redirect(new URL('/login', request.url));
+      const lastStudentPath = request.cookies.get('readiness_last_student_path')?.value || '/home';
+      return NextResponse.redirect(new URL(`${lastStudentPath}${lastStudentPath.includes('?') ? '&' : '?'}restricted=tpc`, request.url));
     }
 
     return NextResponse.next();

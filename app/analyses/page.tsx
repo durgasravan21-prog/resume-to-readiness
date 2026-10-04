@@ -20,9 +20,20 @@ interface AnalysisRecord {
 }
 
 export default function AnalysesListPage() {
+  const [restrictedNotice, setRestrictedNotice] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const restricted = params.get('restricted');
+      if (restricted) {
+        setRestrictedNotice(restricted);
+      }
+    }
+  }, []);
 
   const supabase = createClient();
   const session = getSession();
@@ -82,6 +93,28 @@ export default function AnalysesListPage() {
       <main className="flex-1 w-full pt-16 bg-surface">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
           
+          {/* Security Restriction Banner */}
+          {restrictedNotice && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start justify-between gap-3 text-amber-900 dark:text-amber-200">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0 mt-0.5">shield_lock</span>
+                <div>
+                  <h4 className="font-semibold text-sm">Access Restricted</h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    You are currently viewing student analyses. Access to the Training & Placement Cell coordinator dashboard (<code>/{restrictedNotice}</code>) is restricted.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRestrictedNotice(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg"
+                title="Dismiss"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-surface-variant">
             <div>

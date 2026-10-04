@@ -11,6 +11,7 @@ import { Timer, ArrowRight, Verified, FileSearch, Upload, Calendar, CheckCircle2
 
 export default function StudentHomePage() {
   const router = useRouter();
+  const [restrictedNotice, setRestrictedNotice] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,16 @@ export default function StudentHomePage() {
   const [roadmapProgress, setRoadmapProgress] = useState({ completed: 0, total: 0, percentage: 0 });
   const [pendingTasks, setPendingTasks] = useState<any[]>([]);
   const [upcomingDrives, setUpcomingDrives] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const restricted = params.get('restricted');
+      if (restricted) {
+        setRestrictedNotice(restricted);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -99,7 +110,7 @@ export default function StudentHomePage() {
       if (!isMounted) return;
 
       if (session) {
-        if (session.role === 'coordinator' && cookieRole === 'coordinator' && session.email !== 'durgasravan21@gmail.com') {
+        if (session.role === 'coordinator' && cookieRole === 'coordinator') {
           router.replace('/tpc');
         } else {
           setUser(session);
@@ -212,6 +223,28 @@ export default function StudentHomePage() {
       <main className="flex-1 w-full pt-16 bg-surface">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 w-full">
           
+          {/* Security Restriction Banner */}
+          {restrictedNotice && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start justify-between gap-3 text-amber-900 dark:text-amber-200">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0 mt-0.5">shield_lock</span>
+                <div>
+                  <h4 className="font-semibold text-sm">Access Restricted</h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    You are currently authenticated as a <strong>Student</strong>. Access to the Training & Placement Cell coordinator portal (<code>/{restrictedNotice}</code>) is restricted.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRestrictedNotice(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg"
+                title="Dismiss"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+
           {/* Greeting Section */}
           <section className="mb-8 pb-4 border-b border-surface-variant flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3">
             <div>

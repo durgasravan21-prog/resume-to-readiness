@@ -37,13 +37,18 @@ export default function TopNav() {
   };
 
   const isFacultyParam = searchParams?.get('view') === 'faculty';
-  const isCoordinator =
-    user?.role === 'coordinator' ||
+  const cookieRole = typeof document !== 'undefined'
+    ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+    : null;
+  const activeRole = cookieRole || user?.role || 'student';
+  const isCoordinator = activeRole === 'coordinator' || activeRole === 'mentor' || isFacultyParam;
+
+  const canSwitchRole =
+    user?.email === 'durgasravan21@gmail.com' ||
     user?.role === 'admin' ||
-    user?.role === 'mentor' ||
-    pathname.startsWith('/tpc') ||
-    pathname.startsWith('/mentor') ||
-    isFacultyParam;
+    user?.role === 'coordinator' ||
+    user?.email?.includes('placement') ||
+    user?.email?.includes('nie.ac.in');
 
   const handleToggleRole = () => {
     setMenuOpen(false);
@@ -168,17 +173,19 @@ export default function TopNav() {
                   <p className="font-semibold text-primary">{user?.name}</p>
                   <p className="font-mono text-on-surface-variant text-[10px] truncate">{user?.email}</p>
                   <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-primary-container text-on-primary">
-                    {user?.role}
+                    {activeRole}
                   </span>
                 </div>
 
-                <button
-                  onClick={handleToggleRole}
-                  className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                  <span>Switch to {isCoordinator ? 'Student View' : 'Coordinator View'}</span>
-                </button>
+                {canSwitchRole && (
+                  <button
+                    onClick={handleToggleRole}
+                    className="flex items-center gap-2 w-full p-2 text-on-surface hover:bg-surface-container rounded-lg transition-colors text-left cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                    <span>Switch to {isCoordinator ? 'Student View' : 'Coordinator View'}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleSignOut}

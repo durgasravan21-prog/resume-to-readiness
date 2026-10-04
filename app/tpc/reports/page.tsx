@@ -1,10 +1,11 @@
 'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileTabBar from '@/components/layout/MobileTabBar';
+import { getSession } from '@/lib/auth';
 
 interface DepartmentReport {
   branch: string;
@@ -71,8 +72,28 @@ const DEPARTMENT_METRICS: DepartmentReport[] = [
 ];
 
 export default function CoordinatorReportsPage() {
+  const router = useRouter();
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const session = getSession();
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
+    const effectiveRole = cookieRole || session?.role || 'student';
+
+    if (effectiveRole !== 'coordinator' && effectiveRole !== 'admin') {
+      const lastPath = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_last_student_path='))?.split('=')[1]
+        : null;
+      const target = (lastPath && lastPath.startsWith('/analyses'))
+        ? `${lastPath}${lastPath.includes('?') ? '&' : '?'}restricted=tpc`
+        : '/home?restricted=tpc';
+      router.replace(target);
+    }
+  }, [router]);
 
   const filteredReports = selectedBranch === 'All'
     ? DEPARTMENT_METRICS

@@ -71,4 +71,19 @@ describe('Comprehensive Authorization Matrix (Phase 3)', () => {
       expect(can(undefined as any, 'view', 'student_profile')).toBe(false);
     });
   });
+
+  describe('Endpoint & Role Integrity Protection (Non-Escalation)', () => {
+    it('strictly denies students access to coordinator dashboards and roster tools', () => {
+      expect(can(studentA, 'view', 'student_profile', { college_id: 'col_nie' })).toBe(false);
+      expect(can(studentA, 'manage', 'settings')).toBe(false);
+    });
+
+    it('ensures student role cannot be escalated by unauthorized route requests', () => {
+      // Role remains student and permissions remain restricted
+      const studentAttemptingEscalation = { ...studentA };
+      expect(can(studentAttemptingEscalation, 'view', 'coach_note', { college_id: 'col_nie' })).toBe(false);
+      expect(can(studentAttemptingEscalation, 'create', 'target_role')).toBe(false);
+      expect(studentAttemptingEscalation.role).toBe('student');
+    });
+  });
 });

@@ -120,6 +120,27 @@ export default function StudentCoachingDetailPage() {
   const [grantingChance, setGrantingChance] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Guard against unauthorized student access
+  useEffect(() => {
+    const session = getSession();
+    const cookieRole = typeof document !== 'undefined'
+      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+      : null;
+
+    const effectiveRole = cookieRole || session?.role || 'student';
+
+    if (effectiveRole !== 'coordinator' && effectiveRole !== 'admin') {
+      const lastPath = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_last_student_path='))?.split('=')[1]
+        : null;
+      const target = (lastPath && lastPath.startsWith('/analyses'))
+        ? `${lastPath}${lastPath.includes('?') ? '&' : '?'}restricted=tpc`
+        : '/home?restricted=tpc';
+      router.replace(target);
+      return;
+    }
+  }, [router]);
+
   // Fetch candidate profile, analysis, and notes from Supabase
   useEffect(() => {
     async function fetchCandidateData() {

@@ -382,13 +382,16 @@ export default function CoordinatorDashboardPage() {
       ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
       : null;
 
-    const isAllowedCoordinator =
-      session?.email === 'durgasravan21@gmail.com' ||
-      session?.role === 'coordinator' ||
-      cookieRole === 'coordinator';
+    const effectiveRole = cookieRole || session?.role || 'student';
 
-    if (session && session.role === 'student' && !isAllowedCoordinator) {
-      router.push('/home');
+    if (effectiveRole !== 'coordinator' && effectiveRole !== 'admin') {
+      const lastPath = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_last_student_path='))?.split('=')[1]
+        : null;
+      const target = (lastPath && lastPath.startsWith('/analyses'))
+        ? `${lastPath}${lastPath.includes('?') ? '&' : '?'}restricted=tpc`
+        : '/home?restricted=tpc';
+      router.replace(target);
     }
   }, [router]);
 
