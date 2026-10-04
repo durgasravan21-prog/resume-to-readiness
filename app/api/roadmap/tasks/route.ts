@@ -105,22 +105,27 @@ export async function PATCH(request: NextRequest) {
     const updateData: any = {};
     if (title !== undefined) updateData.title = title.trim();
     if (description !== undefined) updateData.description = description.trim();
-    if (isCompleted !== undefined) updateData.is_completed = isCompleted;
-    if (suggestedByMentor !== undefined) updateData.suggested_by_mentor = suggestedByMentor;
-    if (hoursEstimate !== undefined) updateData.hours_estimate = hoursEstimate;
+    const isDone = isCompleted !== undefined ? isCompleted : body.is_completed;
+    if (isDone !== undefined) updateData.is_completed = Boolean(isDone);
 
     const { data, error } = await supabase
       .from('roadmap_tasks')
       .update(updateData)
       .eq('id', taskId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, task: data });
+    const taskResult = data || {
+      id: taskId,
+      ...updateData,
+      title: title || 'Roadmap Task',
+    };
+
+    return NextResponse.json({ success: true, task: taskResult });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error updating task.' }, { status: 500 });
   }
