@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import ErrorState from '@/components/ui/ErrorState';
 
-const CURATED_ROLES = [
+const FALLBACK_ROLES = [
   {
     id: 'role_jfd',
     title: 'Junior Frontend Developer',
@@ -71,11 +71,50 @@ export default function NewAnalysisPage() {
   const [analyzingStatus, setAnalyzingStatus] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Step 2 State: Target Role
+  // Step 2 State: Target Role (Dynamic from TPC Uploads)
+  const [curatedRoles, setCuratedRoles] = useState(FALLBACK_ROLES);
   const [roleTab, setRoleTab] = useState<'curated' | 'custom'>('curated');
   const [selectedRole, setSelectedRole] = useState<string>('role_jfd');
   const [searchQuery, setSearchQuery] = useState('');
   const [customJD, setCustomJD] = useState('');
+
+  // Fetch real target roles uploaded by TPC / Placement Cell
+  useEffect(() => {
+    fetch('/api/roles')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.roles && data.roles.length > 0) {
+          const mapped = data.roles.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            subtitle: r.companies || (r.category + ' track'),
+            category: r.category || 'General',
+            skills: Array.isArray(r.skills)
+              ? r.skills
+              : typeof r.skills === 'string'
+              ? r.skills.split(',').map((s: string) => s.trim())
+              : [],
+            benchmark: r.benchmark_code || 'Institutional Rubric',
+          }));
+          setCuratedRoles(mapped);
+
+          // Support URL preselection (?roleId=... or ?roleTitle=...)
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetId = urlParams.get('roleId');
+            const targetTitle = urlParams.get('roleTitle');
+
+            if (targetId && mapped.some((m: any) => m.id === targetId)) {
+              setSelectedRole(targetId);
+            } else if (targetTitle) {
+              const matched = mapped.find((m: any) => m.title.toLowerCase() === targetTitle.toLowerCase());
+              if (matched) setSelectedRole(matched.id);
+            }
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load dynamic roles:', err));
+  }, []);
 
   // Handle File Input
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -115,7 +154,7 @@ export default function NewAnalysisPage() {
     setActualFile(file);
   };
 
-  const activeRoleData = CURATED_ROLES.find((r) => r.id === selectedRole) || CURATED_ROLES[0];
+  const activeRoleData = curatedRoles.find((r) => r.id === selectedRole) || curatedRoles[0] || FALLBACK_ROLES[0];
 
   const handleStartAnalysis = async () => {
     if (!actualFile) {
@@ -176,10 +215,10 @@ export default function NewAnalysisPage() {
     }
   };
 
-  const filteredRoles = CURATED_ROLES.filter((r) =>
+  const filteredRoles = curatedRoles.filter((r) =>
     r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.skills.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()))
+    (r.skills || []).some((s: string) => s.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -401,7 +440,7 @@ export default function NewAnalysisPage() {
                         : 'border-transparent text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
-                    Curated Placement Roles ({CURATED_ROLES.length})
+                    Curated Placement Roles ({curatedRoles.length})
                   </button>
                   <button
                     onClick={() => setRoleTab('custom')}

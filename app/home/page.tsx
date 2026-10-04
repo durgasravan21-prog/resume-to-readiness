@@ -19,6 +19,7 @@ export default function StudentHomePage() {
   const [roadmapProgress, setRoadmapProgress] = useState({ completed: 0, total: 0, percentage: 0 });
   const [pendingTasks, setPendingTasks] = useState<any[]>([]);
   const [upcomingDrives, setUpcomingDrives] = useState<any[]>([]);
+  const [targetRoles, setTargetRoles] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -198,6 +199,26 @@ export default function StudentHomePage() {
 
       if (drives) {
         setUpcomingDrives(drives);
+      }
+
+      // 5. Fetch target benchmark roles uploaded by TPC / Coordinators
+      try {
+        const { data: rolesData } = await supabase
+          .from('target_roles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (rolesData && rolesData.length > 0) {
+          setTargetRoles(rolesData);
+        } else {
+          const rolesRes = await fetch('/api/roles');
+          const rolesJson = await rolesRes.json();
+          if (rolesJson?.roles) {
+            setTargetRoles(rolesJson.roles);
+          }
+        }
+      } catch (rolesErr) {
+        console.warn('Roles fetch warning:', rolesErr);
       }
       
     } catch (err) {
@@ -495,6 +516,108 @@ export default function StudentHomePage() {
               )}
             </div>
 
+          </section>
+
+          {/* Institutional Benchmark Roles Uploaded by TPC / Placement Cell */}
+          <section className="bg-surface-container-low border border-outline-variant rounded-xl p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-3 border-b border-outline-variant">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono text-xs text-secondary uppercase tracking-wider font-semibold">
+                    CAMPUS PLACEMENT RUBRICS
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#E8F0EA] text-[#4F7A5A] font-mono text-[10px] font-semibold">
+                    Active TPC Tracks ({targetRoles.length})
+                  </span>
+                </div>
+                <h2 className="font-headline text-xl text-primary font-semibold">
+                  Institutional Target Roles & Preparation Tracks
+                </h2>
+                <p className="font-body text-xs text-on-surface-variant mt-0.5">
+                  Job profiles and benchmark rubrics published by the Training & Placement Cell. Select any track to run a customized readiness diagnostic.
+                </p>
+              </div>
+
+              <Link
+                href="/analyses/new"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary font-semibold text-xs hover:bg-primary/90 transition-colors shadow-xs self-start sm:self-auto shrink-0"
+              >
+                <span>Upload Resume & Diagnose</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-44 rounded-xl bg-surface animate-pulse border border-outline-variant"></div>
+                ))}
+              </div>
+            ) : targetRoles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {targetRoles.map((role) => (
+                  <div
+                    key={role.id}
+                    className="p-5 rounded-xl bg-surface border border-outline-variant shadow-xs flex flex-col justify-between hover:border-primary/40 transition-all"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono text-[10px] uppercase text-secondary font-semibold">
+                          {role.category || 'Placement Track'}
+                        </span>
+                        {role.min_cgpa && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-container-high text-primary font-semibold">
+                            Min CGPA: {role.min_cgpa}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-headline text-base font-semibold text-primary mb-1">
+                        {role.title}
+                      </h3>
+                      <p className="font-body text-xs text-on-surface-variant mb-3 line-clamp-2">
+                        Hiring Partners: <strong className="text-on-surface font-medium">{role.companies || 'Campus Recruitment Drive'}</strong>
+                      </p>
+
+                      {role.skills && role.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {(Array.isArray(role.skills) ? role.skills : []).slice(0, 4).map((sk: string, i: number) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded bg-surface-container-low font-mono text-[10px] text-primary"
+                            >
+                              {sk}
+                            </span>
+                          ))}
+                          {(Array.isArray(role.skills) ? role.skills.length : 0) > 4 && (
+                            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] text-outline">
+                              +{role.skills.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-outline-variant flex items-center justify-between">
+                      <span className="font-mono text-[10px] text-outline">
+                        {role.benchmark_code || 'Standard Rubric'}
+                      </span>
+                      <Link
+                        href={`/analyses/new?roleId=${role.id}&roleTitle=${encodeURIComponent(role.title)}`}
+                        className="font-mono text-xs font-semibold text-secondary hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>Target Role</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-on-surface-variant font-mono border border-dashed border-outline-variant rounded-xl">
+                No active placement tracks published yet. Check back soon or contact your placement coordinator.
+              </div>
+            )}
           </section>
         </div>
       </main>

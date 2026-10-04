@@ -378,6 +378,40 @@ export default function CoordinatorDashboardPage() {
   const [students, setStudents] = useState<StudentRow[]>(ALL_ROSTER_STUDENTS);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Schedule Workshop Modal
+  const [showWorkshopModal, setShowWorkshopModal] = useState(false);
+  const [workshopTitleInput, setWorkshopTitleInput] = useState('');
+  const [workshopDateInput, setWorkshopDateInput] = useState('');
+  const [workshopVenueInput, setWorkshopVenueInput] = useState('Placement Auditorium & Virtual Lab');
+  const [workshopLeadInput, setWorkshopLeadInput] = useState('Dr. Sunita Rao (Placement Cell)');
+  const [workshopSubmitting, setWorkshopSubmitting] = useState(false);
+
+  const handleScheduleWorkshop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workshopTitleInput.trim()) return;
+    setWorkshopSubmitting(true);
+    try {
+      const supabase = createClient();
+      await supabase.from('placement_drives').insert({
+        id: 'drv_' + Math.random().toString(36).substring(2, 9),
+        company_name: 'Institutional Training Cell',
+        role_title: workshopTitleInput.trim(),
+        ctc_range: 'Clinical Skill Workshop',
+        drive_date: workshopDateInput || new Date().toISOString().split('T')[0],
+        deadline: workshopDateInput || new Date().toISOString().split('T')[0],
+        eligibility_cgpa: 'All Branches',
+        status: 'upcoming',
+      });
+    } catch (err) {
+      console.warn('Could not persist workshop to drives:', err);
+    } finally {
+      setWorkshopSubmitting(false);
+      setShowWorkshopModal(false);
+      setToastMessage(`Workshop "${workshopTitleInput}" successfully scheduled for ${workshopDateInput}. Published to student dashboard.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  };
+
   useEffect(() => {
     const session = getSession();
     const cookieRole = typeof document !== 'undefined'
@@ -859,10 +893,13 @@ export default function CoordinatorDashboardPage() {
 
                   <button
                     onClick={() => {
-                      setToastMessage(`${branchConfig.workshopTitle} scheduled for next Saturday`);
-                      setTimeout(() => setToastMessage(null), 3000);
+                      setWorkshopTitleInput(branchConfig.workshopTitle);
+                      const nextSat = new Date();
+                      nextSat.setDate(nextSat.getDate() + ((6 - nextSat.getDay() + 7) % 7 || 7));
+                      setWorkshopDateInput(nextSat.toISOString().split('T')[0]);
+                      setShowWorkshopModal(true);
                     }}
-                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-primary text-on-primary font-semibold text-xs hover:bg-primary-container transition-colors shadow-sm"
+                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-primary text-on-primary font-semibold text-xs hover:bg-primary-container transition-colors shadow-sm cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">event</span>
                     <span>Schedule {branchFilter === 'All' ? 'Workshop' : `${branchFilter.split(' ')[0]} Workshop`}</span>
@@ -883,6 +920,117 @@ export default function CoordinatorDashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Schedule Workshop Modal */}
+      {showWorkshopModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-primary/30 backdrop-blur-xs"
+            onClick={() => setShowWorkshopModal(false)}
+          ></div>
+
+          <div className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-variant p-6 sm:p-8 z-10 space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-surface-container pb-3">
+              <div>
+                <h3 className="font-headline text-lg font-semibold text-primary">
+                  Schedule Departmental Workshop
+                </h3>
+                <p className="font-body text-xs text-on-surface-variant">
+                  Publish a specialized clinical drill for {branchFilter}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowWorkshopModal(false)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleScheduleWorkshop} className="space-y-3.5">
+              <div>
+                <label className="font-semibold text-on-surface block mb-1">
+                  Workshop Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={workshopTitleInput}
+                  onChange={(e) => setWorkshopTitleInput(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-surface-container-low border border-surface-variant text-on-surface font-body focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-on-surface block mb-1">
+                    Scheduled Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={workshopDateInput}
+                    onChange={(e) => setWorkshopDateInput(e.target.value)}
+                    className="w-full p-2.5 rounded-lg bg-surface-container-low border border-surface-variant text-on-surface font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-on-surface block mb-1">
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={branchFilter}
+                    className="w-full p-2.5 rounded-lg bg-surface-container border border-surface-variant text-on-surface-variant font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-on-surface block mb-1">
+                  Faculty Lead / Mentor
+                </label>
+                <input
+                  type="text"
+                  value={workshopLeadInput}
+                  onChange={(e) => setWorkshopLeadInput(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-surface-container-low border border-surface-variant text-on-surface font-body focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-on-surface block mb-1">
+                  Venue & Mode
+                </label>
+                <input
+                  type="text"
+                  value={workshopVenueInput}
+                  onChange={(e) => setWorkshopVenueInput(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-surface-container-low border border-surface-variant text-on-surface font-body focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-surface-container flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWorkshopModal(false)}
+                  className="px-4 py-2 rounded-lg border border-surface-variant hover:bg-surface-container font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={workshopSubmitting}
+                  className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-semibold transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {workshopSubmitting ? 'Scheduling...' : 'Publish Workshop to Students'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Action Toast */}
       {toastMessage && (

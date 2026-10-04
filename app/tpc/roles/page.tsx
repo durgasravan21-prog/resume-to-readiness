@@ -112,6 +112,22 @@ export default function CoordinatorRolesPage() {
     }
   };
 
+  const handleDeleteRole = async (roleId: string, roleTitle: string) => {
+    if (!confirm(`Are you sure you want to remove the target role "${roleTitle}"? It will be removed from student view.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/roles?id=${roleId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete role');
+      setRoles(prev => prev.filter(r => r.id !== roleId));
+      setToastMessage(`Role "${roleTitle}" removed successfully.`);
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Error deleting role');
+    }
+  };
+
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-20 md:pb-12">
       <TopNav />
@@ -202,12 +218,31 @@ export default function CoordinatorRolesPage() {
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-surface-container flex items-center justify-between text-xs font-mono text-outline">
-                      <span>Protocol: {role.benchmark_code || 'Standard'}</span>
-                      <span className="text-[#4F7A5A] font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#4F7A5A]"></span>
-                        Active in Onboarding
-                      </span>
+                    <div className="pt-3 border-t border-surface-container flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-outline">
+                      <div className="flex items-center gap-2">
+                        <span>Protocol: {role.benchmark_code || 'Standard'}</span>
+                        <span className="text-[#4F7A5A] font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#4F7A5A]"></span>
+                          Active
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/analyses/new?roleId=${role.id}&roleTitle=${encodeURIComponent(role.title)}`}
+                          className="px-2.5 py-1 rounded bg-surface-container-high hover:bg-surface-container-highest text-primary font-medium text-[11px] transition-colors"
+                        >
+                          Preview Diagnostic
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteRole(role.id, role.title)}
+                          className="px-2 py-1 rounded bg-[#FFDAD6] hover:bg-[#FFDAD6]/80 text-error font-medium text-[11px] transition-colors inline-flex items-center gap-0.5"
+                          title="Delete benchmark role"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">delete</span>
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -140,3 +140,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const roleId = searchParams.get('id');
+
+    if (!roleId) {
+      return NextResponse.json({ error: 'Role ID is required for deletion.' }, { status: 400 });
+    }
+
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from('target_roles')
+      .delete()
+      .eq('id', roleId);
+
+    if (error) {
+      console.error('Failed to delete target role:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    await supabase.from('audit_log').insert({
+      id: 'aud_' + Math.random().toString(36).substring(2, 9),
+      action: 'TARGET_ROLE_DELETED',
+      target_id: roleId,
+      details: { roleId },
+    });
+
+    return NextResponse.json({ success: true, deletedId: roleId });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+  }
+}

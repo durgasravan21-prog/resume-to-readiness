@@ -116,6 +116,42 @@ export default function CoordinatorReportsPage() {
     }, 800);
   };
 
+  const handleExportCSV = () => {
+    const headers = [
+      'Department Stream',
+      'Code',
+      'Total Cohort Size',
+      'Average Readiness Score',
+      'Tier-1 Ready Percentage',
+      'Core Ready Percentage',
+      'At-Risk Candidate Count',
+      'Primary Departmental Skill Gap',
+    ];
+    const rows = filteredReports.map((d) => [
+      d.branch,
+      d.code,
+      d.totalStudents,
+      `${d.avgReadiness}%`,
+      `${d.tier1ReadyPct}%`,
+      `${d.coreReadyPct}%`,
+      d.atRiskCount,
+      d.topGap,
+    ]);
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `institutional_placement_report_${selectedBranch.toLowerCase()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setExportNotice('Departmental placement audit report exported as CSV.');
+    setTimeout(() => setExportNotice(null), 2500);
+  };
+
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-20 md:pb-12">
       <TopNav />
@@ -139,10 +175,18 @@ export default function CoordinatorReportsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                onClick={handleExportCSV}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest border border-surface-variant text-xs font-mono font-semibold text-primary transition-colors shadow-xs"
+              >
+                <span className="material-symbols-outlined text-[16px]">download</span>
+                <span>Export Report CSV</span>
+              </button>
+
               <button
                 onClick={handleExportSummary}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest border border-surface-variant text-xs font-mono font-semibold text-primary transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-xs font-mono font-semibold transition-colors shadow-xs"
               >
                 <span className="material-symbols-outlined text-[16px]">print</span>
                 <span>Print Executive Summary</span>

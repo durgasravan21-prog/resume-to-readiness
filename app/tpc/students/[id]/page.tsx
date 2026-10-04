@@ -599,7 +599,7 @@ export default function StudentCoachingDetailPage() {
                         Technical Competency Ledger
                       </h3>
                       <Link
-                        href={`/analyses/${analysisId}`}
+                        href={`/analyses/${analysisId}?view=faculty`}
                         className="font-mono text-xs text-secondary hover:underline font-semibold"
                       >
                         Open full interactive diagnosis →

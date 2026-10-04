@@ -38,14 +38,44 @@ export default function CoordinatorSettingsPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('readiness_tpc_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.minCgpa) setMinCgpa(parsed.minCgpa);
+        if (parsed.minReadiness) setMinReadiness(parsed.minReadiness);
+        if (parsed.tier1Readiness) setTier1Readiness(parsed.tier1Readiness);
+        if (parsed.academicYear) setAcademicYear(parsed.academicYear);
+        if (parsed.autoAssignMentors !== undefined) setAutoAssignMentors(parsed.autoAssignMentors);
+        if (parsed.strictProofVerification !== undefined) setStrictProofVerification(parsed.strictProofVerification);
+        if (parsed.emailAlerts !== undefined) setEmailAlerts(parsed.emailAlerts);
+      }
+    } catch {}
+  }, []);
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const config = {
+      minCgpa,
+      minReadiness,
+      tier1Readiness,
+      academicYear,
+      autoAssignMentors,
+      strictProofVerification,
+      emailAlerts,
+      savedAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem('readiness_tpc_settings', JSON.stringify(config));
+    } catch {}
+
     setTimeout(() => {
       setSaving(false);
       setToastMessage('Institutional placement policies and compliance parameters updated successfully.');
       setTimeout(() => setToastMessage(null), 3500);
-    }, 600);
+    }, 400);
   };
 
   return (
