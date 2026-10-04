@@ -371,13 +371,21 @@ export default function StudentCoachingDetailPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Link
-                    href={`/analyses/${analysisId}/mentor`}
+                    href={`/mentor?studentId=${studentId}`}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-lowest text-primary font-semibold text-xs hover:bg-surface-container transition-colors shadow-xs border border-surface-variant"
                   >
                     <span className="material-symbols-outlined text-[16px]">chat_bubble_outline</span>
-                    <span>Mentor consultation</span>
+                    <span>Open Mentorship Consultation</span>
+                  </Link>
+
+                  <Link
+                    href={`/analyses/${analysisId}/roadmap?view=faculty&studentId=${studentId}`}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-lowest text-primary font-semibold text-xs hover:bg-surface-container transition-colors shadow-xs border border-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">route</span>
+                    <span>View Roadmap</span>
                   </Link>
 
                   <button
@@ -716,7 +724,7 @@ export default function StudentCoachingDetailPage() {
                     Sprint Roadmap Tasks & Evidence Outcomes
                   </h3>
                   <Link
-                    href={`/analyses/${analysisId}/roadmap`}
+                    href={`/analyses/${analysisId}/roadmap?view=faculty&studentId=${studentId}`}
                     className="font-mono text-xs text-secondary hover:underline font-semibold"
                   >
                     View candidate roadmap →

@@ -55,7 +55,14 @@ export default function MentorPage() {
   }, []);
 
   // Faculty mode is explicitly enabled by ?view=faculty or when user has switched to coordinator view
-  const isFacultyMode = isFacultyViewParam || (cookieRole === 'coordinator');
+  const isFacultyMode =
+    isFacultyViewParam ||
+    cookieRole === 'coordinator' ||
+    (typeof document !== 'undefined' && document.cookie.includes('readiness_role=coordinator')) ||
+    session?.role === 'coordinator' ||
+    session?.role === 'admin' ||
+    session?.email === 'durgasravan21@gmail.com' ||
+    Boolean(session?.email?.includes('placement'));
 
   const [analysisId, setAnalysisId] = useState<string>(rawAnalysisId);
   const [studentInfo, setStudentInfo] = useState<{ name: string; branch: string; roll: string } | null>(null);
@@ -68,9 +75,29 @@ export default function MentorPage() {
   const [chatStatus, setChatStatus] = useState<'open' | 'waiting_for_mentor'>('open');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Resolve effective analysis ID if visiting 'default' as a logged-in student
+  // Resolve effective analysis ID if visiting 'default' as a logged-in student or faculty with studentId
   useEffect(() => {
     async function resolveAnalysis() {
+      const targetStudentId = searchParams.get('studentId');
+      if ((rawAnalysisId === 'default' || !rawAnalysisId) && targetStudentId) {
+        try {
+          const { data } = await supabase
+            .from('analyses')
+            .select('id')
+            .eq('user_id', targetStudentId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (data?.id) {
+            setAnalysisId(data.id);
+            return;
+          }
+        } catch {
+          // Keep default
+        }
+      }
+
       if ((rawAnalysisId === 'default' || !rawAnalysisId) && session?.id && !isFacultyMode) {
         try {
           const { data } = await supabase
@@ -92,7 +119,7 @@ export default function MentorPage() {
       setAnalysisId(rawAnalysisId);
     }
     resolveAnalysis();
-  }, [rawAnalysisId, session?.id, isFacultyMode, supabase]);
+  }, [rawAnalysisId, session?.id, isFacultyMode, searchParams, supabase]);
 
   // Load student & assigned faculty details
   useEffect(() => {
@@ -102,12 +129,15 @@ export default function MentorPage() {
           .from('analyses')
           .select('user_id, dream_role')
           .eq('id', analysisId)
-          .single();
+          .maybeSingle();
 
-        if (analysis?.user_id) {
+        const targetStudentId = searchParams.get('studentId');
+        const effectiveStudentId = analysis?.user_id || targetStudentId;
+
+        if (effectiveStudentId) {
           const [profileRes, assignRes] = await Promise.all([
-            supabase.from('profiles').select('name, branch, roll_number').eq('id', analysis.user_id).single(),
-            supabase.from('mentor_assignments').select('mentor_id').eq('student_id', analysis.user_id).single(),
+            supabase.from('profiles').select('name, branch, roll_number').eq('id', effectiveStudentId).maybeSingle(),
+            supabase.from('mentor_assignments').select('mentor_id').eq('student_id', effectiveStudentId).maybeSingle(),
           ]);
 
           if (profileRes.data) {

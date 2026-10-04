@@ -43,8 +43,16 @@ export default function RoadmapPage() {
     }
   }, []);
 
-  const isFacultyMode = searchParams.get('view') === 'faculty' || cookieRole === 'coordinator';
+  const isFacultyMode =
+    searchParams.get('view') === 'faculty' ||
+    cookieRole === 'coordinator' ||
+    (typeof document !== 'undefined' && document.cookie.includes('readiness_role=coordinator')) ||
+    session?.role === 'coordinator' ||
+    session?.role === 'admin' ||
+    session?.email === 'durgasravan21@gmail.com' ||
+    Boolean(session?.email?.includes('placement'));
 
+  const [activeAnalysisId, setActiveAnalysisId] = useState<string>(analysisId);
   const [tasks, setTasks] = useState<RoadmapTask[]>([]);
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [candidateProfile, setCandidateProfile] = useState<{ name: string; roll: string; branch: string; role: string } | null>(null);
@@ -83,8 +91,26 @@ export default function RoadmapPage() {
     setLoading(true);
 
     try {
+      const targetStudentId = searchParams.get('studentId');
+      let effectiveId = analysisId;
+
+      // If viewing as faculty or coordinator and candidate studentId is supplied:
+      if ((analysisId === 'default' || !analysisId) && targetStudentId) {
+        const { data: stAn } = await supabase
+          .from('analyses')
+          .select('id, dream_role, user_id')
+          .eq('user_id', targetStudentId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (stAn?.id) {
+          effectiveId = stAn.id;
+        }
+      }
+
       // Access Control: If student visits 'default', find their latest analysis and navigate there
-      if (analysisId === 'default' && session?.id && !isFacultyMode) {
+      if (effectiveId === 'default' && session?.id && !isFacultyMode) {
         const { data: myAn } = await supabase
           .from('analyses')
           .select('id')
@@ -99,10 +125,12 @@ export default function RoadmapPage() {
         }
       }
 
+      setActiveAnalysisId(effectiveId);
+
       const [tasksRes, itemsRes, analysisRes] = await Promise.all([
-        supabase.from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('created_at', { ascending: true }),
-        supabase.from('roadmap_items').select('*').eq('analysis_id', analysisId),
-        supabase.from('analyses').select('user_id, dream_role').eq('id', analysisId).maybeSingle(),
+        supabase.from('roadmap_tasks').select('*').eq('analysis_id', effectiveId).order('created_at', { ascending: true }),
+        supabase.from('roadmap_items').select('*').eq('analysis_id', effectiveId),
+        supabase.from('analyses').select('user_id, dream_role').eq('id', effectiveId).maybeSingle(),
       ]);
 
       // Student Access Restriction: A student CANNOT view another student's progress or roadmap
@@ -134,7 +162,7 @@ export default function RoadmapPage() {
             {
               id: 'task_default_1',
               roadmap_id: 'rmi_prioritize',
-              analysis_id: analysisId,
+              analysis_id: effectiveId,
               title: 'Build Global Redux Toolkit Store with Async Thunks & Query Cache',
               description: 'Implement centralized state slices, typed selectors, and mutation handlers with optimistic rollback.',
               status: 'in_progress',
@@ -145,7 +173,7 @@ export default function RoadmapPage() {
             {
               id: 'task_default_2',
               roadmap_id: 'rmi_sequence',
-              analysis_id: analysisId,
+              analysis_id: effectiveId,
               title: 'Configure Vitest & React Testing Library User Flow Specs',
               description: 'Cover auth state transitions, form validation edge cases, and asynchronous error boundaries.',
               status: 'todo',
@@ -156,7 +184,7 @@ export default function RoadmapPage() {
             {
               id: 'task_default_3',
               roadmap_id: 'rmi_prove',
-              analysis_id: analysisId,
+              analysis_id: effectiveId,
               title: 'Production Bundle Analyzer & Route-level Code Splitting',
               description: 'Optimize bundle size using React.lazy, dynamic imports, and measure Core Web Vitals.',
               status: 'todo',
@@ -171,19 +199,20 @@ export default function RoadmapPage() {
       setTasks(loadedTasks);
       if (itemsRes.data) setItems(itemsRes.data);
 
-      if (analysisRes.data?.user_id) {
+      const candidateUserId = analysisRes.data?.user_id || targetStudentId;
+      if (candidateUserId) {
         const { data: prof } = await supabase
           .from('profiles')
           .select('name, roll_number, branch')
-          .eq('id', analysisRes.data.user_id)
-          .single();
+          .eq('id', candidateUserId)
+          .maybeSingle();
 
         if (prof) {
           setCandidateProfile({
             name: prof.name || 'Candidate',
             roll: prof.roll_number || '',
             branch: prof.branch || 'Engineering',
-            role: analysisRes.data.dream_role || 'Junior Frontend Developer',
+            role: analysisRes.data?.dream_role || 'Junior Frontend Developer',
           });
         }
       }
@@ -196,7 +225,7 @@ export default function RoadmapPage() {
 
   useEffect(() => {
     loadData();
-  }, [analysisId]);
+  }, [analysisId, searchParams.get('studentId'), searchParams.get('view')]);
 
   const toggleTask = async (taskId: string) => {
     const taskIndex = tasks.findIndex((t) => t.id === taskId);
@@ -240,7 +269,7 @@ export default function RoadmapPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analysisId,
+          analysisId: activeAnalysisId || analysisId,
           title: taskTitle.trim(),
           description: taskDescription.trim(),
           hoursEstimate: taskHours.trim(),

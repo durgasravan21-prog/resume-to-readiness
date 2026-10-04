@@ -23,6 +23,7 @@ interface StudentRosterItem {
   lastActivity: string;
   status: 'active' | 'at_risk' | 'terminated';
   flagCount: number;
+  analysisId?: string;
 }
 
 const FALLBACK_STUDENTS: StudentRosterItem[] = [
@@ -40,6 +41,7 @@ const FALLBACK_STUDENTS: StudentRosterItem[] = [
     lastActivity: 'Just now',
     status: 'active',
     flagCount: 0,
+    analysisId: 'ans_durga_01',
   },
   {
     id: 'usr_ananya',
@@ -369,6 +371,7 @@ export default function StudentsRosterPage() {
                   : 'Active recently',
                 status: (pStatus?.status as any) || 'active',
                 flagCount: pStatus?.flag_count || 0,
+                analysisId: userAnalysis?.id,
               };
             });
 
@@ -698,13 +701,24 @@ export default function StudentsRosterPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <Link
-                              href={`/tpc/students/${st.id}`}
-                              className="inline-flex items-center gap-1 font-semibold text-primary hover:text-primary/80 hover:underline"
-                            >
-                              <span>Audit</span>
-                              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                            </Link>
+                            <div className="inline-flex items-center gap-2 justify-end">
+                              <Link
+                                href={`/analyses/${st.analysisId || 'default'}/roadmap?view=faculty&studentId=${st.id}`}
+                                className="inline-flex items-center gap-1 font-semibold text-secondary hover:text-secondary/80 hover:underline text-xs"
+                                title="View candidate sprint roadmap"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">route</span>
+                                <span>Roadmap</span>
+                              </Link>
+                              <span className="text-outline-variant">·</span>
+                              <Link
+                                href={`/tpc/students/${st.id}`}
+                                className="inline-flex items-center gap-1 font-semibold text-primary hover:text-primary/80 hover:underline text-xs"
+                              >
+                                <span>Audit</span>
+                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       ))

@@ -21,6 +21,7 @@ interface StudentRow {
   topGap: string;
   lastActivity: string;
   readinessScore: number;
+  analysisId?: string;
 }
 
 const ALL_ROSTER_STUDENTS: StudentRow[] = [
@@ -36,6 +37,7 @@ const ALL_ROSTER_STUDENTS: StudentRow[] = [
     topGap: 'Webpack chunk-splitting',
     lastActivity: 'Just now',
     readinessScore: 78,
+    analysisId: 'ans_durga_01',
   },
   {
     id: 'usr_ananya',
@@ -434,6 +436,7 @@ export default function CoordinatorDashboardPage() {
                   ? new Date(userAnalysis.created_at).toLocaleDateString()
                   : 'Today',
                 readinessScore: score,
+                analysisId: userAnalysis?.id,
               };
             });
 
@@ -773,13 +776,24 @@ export default function CoordinatorDashboardPage() {
                                 {st.lastActivity}
                               </td>
                               <td className="py-2.5 px-4 text-right">
-                                <Link
-                                  href={`/tpc/students/${st.id}`}
-                                  className="font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
-                                >
-                                  <span>View audit</span>
-                                  <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                                </Link>
+                                <div className="inline-flex items-center gap-2 justify-end">
+                                  <Link
+                                    href={`/analyses/${st.analysisId || 'default'}/roadmap?view=faculty&studentId=${st.id}`}
+                                    className="font-semibold text-secondary hover:underline inline-flex items-center gap-0.5 text-xs"
+                                    title="View candidate sprint roadmap"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px]">route</span>
+                                    <span>Roadmap</span>
+                                  </Link>
+                                  <span className="text-outline-variant">·</span>
+                                  <Link
+                                    href={`/tpc/students/${st.id}`}
+                                    className="font-semibold text-primary hover:underline inline-flex items-center gap-0.5 text-xs"
+                                  >
+                                    <span>Audit</span>
+                                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                                  </Link>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -835,6 +849,14 @@ export default function CoordinatorDashboardPage() {
                 </div>
 
                 <div className="pt-5 mt-4 border-t border-surface-container flex flex-col gap-2">
+                  <Link
+                    href="/mentor"
+                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-surface-container-low hover:bg-surface-container text-primary font-semibold text-xs transition-colors border border-surface-variant shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-primary">chat_bubble_outline</span>
+                    <span>Open Mentorship Desk</span>
+                  </Link>
+
                   <button
                     onClick={() => {
                       setToastMessage(`${branchConfig.workshopTitle} scheduled for next Saturday`);

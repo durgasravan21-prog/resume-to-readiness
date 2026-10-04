@@ -239,9 +239,22 @@ export default function MentorConsolePage() {
 
       setStudents(candidates);
 
-      // Select student with waiting message first, or first candidate
+      // Select requested student from URL param, student with waiting message, or first candidate
       if (candidates.length > 0) {
+        let requestedStudentId: string | null = null;
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          requestedStudentId = urlParams.get('studentId');
+        }
+
         setSelectedStudentForChat((prev) => {
+          if (requestedStudentId) {
+            const requested = candidates.find((c) => c.id === requestedStudentId);
+            if (requested) {
+              setActiveTab('inbox');
+              return requested;
+            }
+          }
           if (prev) {
             const updated = candidates.find((c) => c.id === prev.id);
             if (updated) return updated;
@@ -259,6 +272,12 @@ export default function MentorConsolePage() {
   }, [availableMentors, supabase]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('studentId')) {
+        setActiveTab('inbox');
+      }
+    }
     loadMentors();
   }, [loadMentors]);
 
@@ -676,7 +695,7 @@ export default function MentorConsolePage() {
                             Skill Map
                           </Link>
                           <Link
-                            href={`/analyses/${student.analysisId}/roadmap?view=faculty`}
+                            href={`/analyses/${student.analysisId}/roadmap?view=faculty&studentId=${student.id}`}
                             className="flex-1 text-center py-2 px-2.5 rounded-lg border border-surface-variant hover:bg-surface-container text-xs font-semibold transition-colors"
                           >
                             Roadmap
