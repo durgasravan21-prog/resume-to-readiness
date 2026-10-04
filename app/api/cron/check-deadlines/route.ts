@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
             .from('program_status')
             .select('*')
             .eq('student_id', studentId)
-            .single();
+            .maybeSingle();
 
           const newFlagCount = (statusRow?.flag_count ?? 0) + 1;
           const isTerminated = newFlagCount >= 3;

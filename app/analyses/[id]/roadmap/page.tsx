@@ -100,9 +100,9 @@ export default function RoadmapPage() {
       }
 
       const [tasksRes, itemsRes, analysisRes] = await Promise.all([
-        supabase.from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('order_index', { ascending: true }),
+        supabase.from('roadmap_tasks').select('*').eq('analysis_id', analysisId).order('created_at', { ascending: true }),
         supabase.from('roadmap_items').select('*').eq('analysis_id', analysisId),
-        supabase.from('analyses').select('user_id, dream_role').eq('id', analysisId).single(),
+        supabase.from('analyses').select('user_id, dream_role').eq('id', analysisId).maybeSingle(),
       ]);
 
       // Student Access Restriction: A student CANNOT view another student's progress or roadmap
@@ -207,14 +207,26 @@ export default function RoadmapPage() {
 
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, is_completed: newStatus } : t)));
 
-    const { error } = await supabase
-      .from('roadmap_tasks')
-      .update({ is_completed: newStatus })
-      .eq('id', taskId);
+    try {
+      const res = await fetch('/api/roadmap/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, isCompleted: newStatus }),
+      });
+      if (!res.ok) {
+        throw new Error('API task update failed');
+      }
+    } catch (err) {
+      console.warn('API task update fallback to direct supabase:', err);
+      const { error } = await supabase
+        .from('roadmap_tasks')
+        .update({ is_completed: newStatus })
+        .eq('id', taskId);
 
-    if (error) {
-      console.error('Failed to update task', error);
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, is_completed: currentStatus } : t)));
+      if (error) {
+        console.error('Failed to update task', error);
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, is_completed: currentStatus } : t)));
+      }
     }
   };
 

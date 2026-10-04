@@ -143,9 +143,23 @@ export default function WelcomePage() {
   };
 
   // Demo bypass helpers
-  const handleDemoSignIn = (role: 'student' | 'coordinator' | 'mentor' | 'admin' | 'new_student') => {
+  const handleDemoSignIn = (role: 'student' | 'coordinator' | 'mentor' | 'admin' | 'new_student' | 'durga') => {
     setLoading(true);
-    if (role === 'coordinator') {
+    if (role === 'durga') {
+      saveSession({
+        id: '36ac8503-c1c5-4865-b3f5-51c302a3e1ee',
+        name: 'Durga sravan Challagolla',
+        email: 'durgasravan21@gmail.com',
+        role: 'student',
+        rollNumber: '2021BCS0101',
+        degree: 'B.Tech',
+        branch: 'Computer Science & Engineering',
+        graduationYear: '2025',
+        cgpa: '8.92',
+        collegeName: 'National Institute of Engineering',
+      });
+      router.push('/home');
+    } else if (role === 'coordinator') {
       saveSession(DEFAULT_COORDINATOR);
       router.push('/tpc');
     } else if (role === 'mentor') {
@@ -227,11 +241,15 @@ export default function WelcomePage() {
               Diagnostic & Placement Architecture
             </span>
 
-            <h1 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-semibold text-primary mt-2 mb-4 tracking-tight leading-tight">
-              Know exactly where your skills stand before campus drives begin.
+            <h1 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-semibold text-primary mt-2 mb-3 tracking-tight leading-tight">
+              From resume to readiness
             </h1>
 
-            <p className="font-body text-sm sm:text-base text-on-surface-variant leading-relaxed mb-6">
+            <p className="font-body text-base text-primary/85 font-medium mb-2">
+              Upload your resume, pick a role, and get a plain-language plan for what to learn next.
+            </p>
+
+            <p className="font-body text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-6">
               A transparent, rubric-backed appraisal of your engineering portfolio against real placement benchmarks. No algorithmic obscurity. Just clear evidence, diagnostic roadmaps, and actionable mentorship.
             </p>
 
@@ -500,27 +518,35 @@ export default function WelcomePage() {
                     Evaluation Bypass
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleDemoSignIn('durga')}
+                    className="py-1.5 px-2 rounded-lg bg-primary-container/15 hover:bg-primary-container/25 text-primary font-mono text-[11px] font-semibold border border-primary/25 transition-colors text-center"
+                    title="Durga sravan (Lead/Candidate)"
+                  >
+                    Durga S.
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDemoSignIn('student')}
                     className="py-1.5 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-primary font-mono text-[11px] border border-surface-container-highest transition-colors text-center"
                   >
-                    Student
+                    Ananya R.
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDemoSignIn('new_student')}
                     className="py-1.5 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-secondary font-mono text-[11px] border border-surface-container-highest transition-colors text-center"
                   >
-                    + Onboarding
+                    + Onboard
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDemoSignIn('coordinator')}
                     className="py-1.5 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-primary font-mono text-[11px] border border-surface-container-highest transition-colors text-center"
                   >
-                    Coordinator
+                    TPC Lead
                   </button>
                   <button
                     type="button"
@@ -598,29 +624,33 @@ export default function WelcomePage() {
 
         {/* Right Column: Editorial Visual Banner */}
         <div className="lg:col-span-5 flex justify-center">
-          <div className="w-full max-w-md bg-surface-container-lowest rounded-2xl border border-surface-container-highest p-6 shadow-sm space-y-5">
-            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-surface-container-low relative">
+          <div className="w-full max-w-md bg-surface-container-lowest rounded-2xl border border-surface-container-highest p-4 shadow-sm space-y-4">
+            <div className="relative rounded-xl overflow-hidden bg-surface-container-low shadow-xs">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv37OrsHEsAbKUphjT_YMfY-GU_zQrMaBrYm4WnzCJDENkgU9qSgHl_BzgGJ8fJ6_5DUmnEOMTrViQoNsXe3bYPcdbo70RHDPO0aty9cxcLeBUPlWeNfDjINQuQx7EYBTpqi3IchqgHnzd66kY9-geLWeFkQ80E-B54fB1y0EFg69ZlesuJlwAWwFNY5X6rARjn4KLbeG4j1o3uaQCVDc9anbAkcC4bKBDYBIHNzdNzBvsStCCcSJwAA"
-                alt="Institutional Campus Advisory"
-                className="w-full h-full object-cover"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5L6b4t8MKW9JRAz6qAw6cRvnO6ne5h4e-r9zwqUoqcXCxYRQWOKOBbl-4NRL_T1NdWbVEiGRNlk4t0DuB5Bz7Y3FPt-mAZSGI1AvGpXROx23lOWgoUmV0sk2yhLLeMwwEarsCU8RD5SyLAOB_x98F0f3OjkSQgDU_fEqIfJ7oOpL21mL-SeB337uiQ6SWQV436L7eL9a_2Q9R_cfl66TH31KMpywI__hLV-xnhVoU-w8Qtbb0LB9cyg"
+                alt="Indian college student standing thoughtfully with a notebook in a sunlit university corridor"
+                className="w-full h-[380px] sm:h-[440px] lg:h-[480px] object-cover object-top"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent flex items-end p-5">
+              <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/30 to-transparent flex items-end p-5">
                 <div className="text-on-primary">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-fixed font-semibold">Verified Syllabus</span>
-                  <p className="font-headline text-lg font-medium leading-snug mt-0.5">Benchmarked against Tier-1 Product & IT Services hiring rubrics</p>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-fixed font-semibold bg-primary/40 px-2 py-0.5 rounded backdrop-blur-xs">
+                    Campus Placement Rubric
+                  </span>
+                  <p className="font-headline text-base sm:text-lg font-medium leading-snug mt-1.5">
+                    Benchmarked against Tier-1 Product & IT Services hiring rubrics
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3.5 pt-2">
+            <div className="space-y-3 pt-1">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary shrink-0 mt-0.5">
                   <BookOpen className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-headline text-xs font-semibold text-primary">Granular Evidence Extraction</h3>
-                  <p className="text-[11px] text-on-surface-variant leading-relaxed">Line-by-line verification against technical hiring rubrics.</p>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">Line-by-line verification against technical hiring rubrics without guessing.</p>
                 </div>
               </div>
 
@@ -630,13 +660,117 @@ export default function WelcomePage() {
                 </div>
                 <div>
                   <h3 className="font-headline text-xs font-semibold text-primary">Sequential Preparation Sprints</h3>
-                  <p className="text-[11px] text-on-surface-variant leading-relaxed">Prioritized by recruitment frequency in upcoming drives.</p>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">Prioritized by recruitment frequency in upcoming campus placement drives.</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Comprehensive Platform Explanation & Architecture Section */}
+      <section className="border-t border-surface-container-highest bg-surface-container-lowest/70 py-16 px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="font-mono text-xs uppercase tracking-wider text-secondary font-semibold">
+              Platform Architecture
+            </span>
+            <h2 className="font-headline text-2xl sm:text-3xl font-semibold text-primary mt-1 mb-3">
+              How Readiness Transforms Placement Preparation
+            </h2>
+            <p className="font-body text-sm text-on-surface-variant leading-relaxed">
+              Instead of opaque AI scores or generic resume tips, Readiness provides a structured 4-step diagnostic pipeline calibrated against real campus hiring expectations.
+            </p>
+          </div>
+
+          {/* 4 Core Steps Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Step 1 */}
+            <div className="bg-surface-container-lowest rounded-2xl p-6 border border-surface-container-highest shadow-xs hover:border-primary/40 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center font-mono font-bold text-sm mb-4">
+                01
+              </div>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Resume & Portfolio Intake
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Upload your resume in PDF, DOCX, or text format. Our parser extracts your project details, tech stack, coursework, and GitHub repositories without hallucination or data loss.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="bg-surface-container-lowest rounded-2xl p-6 border border-surface-container-highest shadow-xs hover:border-primary/40 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-secondary-container/30 text-secondary flex items-center justify-center font-mono font-bold text-sm mb-4">
+                02
+              </div>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Role Rubric Alignment
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Compare your competencies against target roles — Frontend, Backend, Full-Stack, SDE, or Data Analyst. Benchmarks are derived from actual Tier-1 company interview criteria.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-surface-container-lowest rounded-2xl p-6 border border-surface-container-highest shadow-xs hover:border-primary/40 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center font-mono font-bold text-sm mb-4">
+                03
+              </div>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                Evidence-Backed Diagnosis
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Every skill is categorized into <span className="font-semibold text-primary">Strong</span>, <span className="font-semibold text-secondary">Needs Proof</span>, or <span className="font-semibold text-error">Missing</span>. We quote direct evidence lines from your resume and provide actionable explanations.
+              </p>
+            </div>
+
+            {/* Step 4 */}
+            <div className="bg-surface-container-lowest rounded-2xl p-6 border border-surface-container-highest shadow-xs hover:border-primary/40 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-secondary-container/30 text-secondary flex items-center justify-center font-mono font-bold text-sm mb-4">
+                04
+              </div>
+              <h3 className="font-headline text-base font-semibold text-primary mb-2">
+                6-Week Action Roadmap
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Receive prioritized weekly preparation sprints with interactive task checklists, code repos to build, and direct messaging with assigned campus faculty mentors.
+              </p>
+            </div>
+          </div>
+
+          {/* About The Platform / Institutional Strip */}
+          <div className="mt-12 p-6 sm:p-8 rounded-2xl bg-surface-container-low border border-surface-container-highest flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
+            <div className="space-y-1.5 text-center md:text-left max-w-2xl">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-secondary font-semibold">
+                Campus Placement Cell & Faculty Integration
+              </span>
+              <h4 className="font-headline text-base sm:text-lg font-semibold text-primary">
+                Connecting Students, Mentors, and Placement Officers
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Placement Coordinators track branch-wide cohort readiness, identify critical skill gaps across departments, and dispatch timely interventions before campus drives begin.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn('coordinator')}
+                className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-mono text-xs font-semibold hover:bg-primary-container transition-all shadow-xs"
+              >
+                Launch TPC Console →
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn('durga')}
+                className="px-4 py-2.5 rounded-xl bg-surface border border-surface-container-highest text-primary font-mono text-xs font-semibold hover:bg-surface-container transition-all"
+              >
+                Durga S. Portal →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Editorial Footer */}
       <footer className="px-6 lg:px-12 py-4 border-t border-surface-container-highest text-xs font-mono text-on-surface-variant flex flex-col sm:flex-row items-center justify-between gap-2">

@@ -131,7 +131,7 @@ export default function StudentCoachingDetailPage() {
           .from('profiles')
           .select('*')
           .or(`id.eq.${studentId},email.eq.${studentId}`)
-          .single();
+          .maybeSingle();
 
         // 2. Fetch analysis
         const { data: analyses } = await supabase
@@ -172,7 +172,7 @@ export default function StudentCoachingDetailPage() {
           .from('program_status')
           .select('*')
           .eq('student_id', studentId)
-          .single();
+          .maybeSingle();
 
         if (pStatus) {
           setProgramStatus((pStatus.status as any) || 'active');

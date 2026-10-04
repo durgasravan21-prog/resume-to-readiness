@@ -10,6 +10,7 @@ export default function TopNav() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
     const session = getSession();
@@ -134,11 +135,18 @@ export default function TopNav() {
               className="relative flex items-center justify-center p-0.5 rounded-full border border-surface-variant hover:ring-2 hover:ring-primary/20 transition-all focus:outline-none"
               title="Account options"
             >
-              <img
-                src={user?.avatarUrl || 'https://lh3.googleusercontent.com/aida/AEtjO1WdKXqNRspbpeyaqj--Djbz-rUwt4twHbg-W0QFpJL5QjyYt80ttJsTLkovyDI_ENraMh-GwTB4izML4KQkzNUdTqtGYnClifUTgkIWVQbauT_Ln6m6lStaoBT1PxR4awTDClw2aidI0t7lohoqfs3mb3gDJ3wLwrsvM5M9DvcfHmijKNWVlwFPvx7IMB1UoIr84vfa-IhHwuM80XVgDnVMp0dwmRDtuxiMc2mC4jJ3ax7s_N6ynozDxW8'}
-                alt={user?.name || 'Profile'}
-                className="w-8 h-8 rounded-full object-cover"
-              />
+              {avatarError || !user?.avatarUrl ? (
+                <div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[11px] font-mono select-none">
+                  {user?.name ? user.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() : 'U'}
+                </div>
+              ) : (
+                <img
+                  src={user.avatarUrl}
+                  alt={user?.name || 'Profile'}
+                  onError={() => setAvatarError(true)}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              )}
             </button>
 
             {/* Dropdown Menu */}

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       .from('program_status')
       .select('*')
       .eq('student_id', studentId)
-      .single();
+      .maybeSingle();
 
     const currentChances = statusRow?.chances_used ?? 0;
     if (currentChances >= 3) {
