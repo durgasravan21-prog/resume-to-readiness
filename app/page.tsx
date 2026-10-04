@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { saveSession, DEFAULT_STUDENT, DEFAULT_COORDINATOR } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/client';
@@ -194,13 +195,24 @@ export default function WelcomePage() {
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-xs font-mono text-on-surface-variant">
-          <span className="hidden md:inline">Placement Cycle 2025–26</span>
+        <div className="flex items-center gap-3 text-xs font-mono text-on-surface-variant">
+          <Link
+            href="/login"
+            className="px-2.5 py-1 text-on-surface hover:text-primary font-medium transition-colors"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/signup"
+            className="px-3 py-1 rounded-md bg-primary text-on-primary font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Register
+          </Link>
           <button
             onClick={() => handleDemoSignIn('coordinator')}
-            className="text-primary hover:underline font-semibold flex items-center gap-1"
+            className="text-primary hover:underline font-semibold flex items-center gap-1 ml-1"
           >
-            <span>Coordinator Portal</span>
+            <span>Coordinator</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

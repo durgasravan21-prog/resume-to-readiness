@@ -12,10 +12,10 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     if ((pathname.startsWith('/home') || pathname.startsWith('/analyses') || pathname.startsWith('/settings')) && !role) {
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
     if (pathname.startsWith('/tpc') && role !== 'coordinator' && role !== 'admin') {
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
     return NextResponse.next();

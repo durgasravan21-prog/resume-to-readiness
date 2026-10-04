@@ -41,13 +41,20 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public paths allowed without authentication
-  const isPublicPath = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.includes('.');
+  const isPublicPath =
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/_next') ||
+    pathname.includes('.');
 
   const demoRole = request.cookies.get('readiness_role')?.value;
 
   if (!user && demoRole) {
     const role = demoRole;
-    if (pathname === '/') {
+    if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/signup')) {
       if (role === 'student') return NextResponse.redirect(new URL('/home', request.url));
       if (role === 'mentor') return NextResponse.redirect(new URL('/mentor', request.url));
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));
@@ -80,7 +87,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user && !demoRole && !isPublicPath) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (user) {
@@ -123,7 +130,7 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Role-based route guard
-    if (pathname === '/' || (pathname.startsWith('/onboarding') && onboardingCompleted)) {
+    if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/signup') || (pathname.startsWith('/onboarding') && onboardingCompleted)) {
       if (role === 'student' || isDurga) return NextResponse.redirect(new URL('/home', request.url));
       if (role === 'mentor') return NextResponse.redirect(new URL('/mentor', request.url));
       if (role === 'coordinator') return NextResponse.redirect(new URL('/tpc', request.url));

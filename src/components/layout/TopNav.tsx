@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { getSession, saveSession, clearSession, UserProfile } from '@/lib/auth';
+import { getSession, saveSession, clearSession, signOutUser, UserProfile } from '@/lib/auth';
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -29,9 +29,9 @@ export default function TopNav() {
     }
   }, []);
 
-  const handleSignOut = () => {
-    clearSession();
-    router.push('/');
+  const handleSignOut = async () => {
+    setMenuOpen(false);
+    await signOutUser();
   };
 
   const isCoordinator = user?.role === 'coordinator' || pathname.startsWith('/tpc') || pathname.startsWith('/mentor');

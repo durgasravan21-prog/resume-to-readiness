@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TopNav from '@/components/layout/TopNav';
 import MobileTabBar from '@/components/layout/MobileTabBar';
-import { getSession, UserProfile } from '@/lib/auth';
+import { getSession, saveSession, UserProfile } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/client';
-import { Timer, ArrowRight, Verified, FileSearch, Upload, Calendar, CheckCircle2, Circle, Clock, FileText } from 'lucide-react';
+import { Timer, ArrowRight, Verified, FileSearch, Upload, Calendar, CheckCircle2, Circle, Clock, FileText, Loader2 } from 'lucide-react';
 
 export default function StudentHomePage() {
   const router = useRouter();
@@ -20,21 +20,102 @@ export default function StudentHomePage() {
   const [upcomingDrives, setUpcomingDrives] = useState<any[]>([]);
 
   useEffect(() => {
-    const session = getSession();
-    const cookieRole = typeof document !== 'undefined'
-      ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
-      : null;
+    let isMounted = true;
 
-    if (session) {
-      if (session.role === 'coordinator' && cookieRole === 'coordinator' && session.email !== 'durgasravan21@gmail.com') {
-        router.push('/tpc');
-      } else {
-        setUser(session);
-        fetchDashboardData(session.id);
+    async function initSession() {
+      const supabase = createClient();
+      let session = getSession();
+      const cookieRole = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_role='))?.split('=')[1]
+        : null;
+      const cookieUserId = typeof document !== 'undefined'
+        ? document.cookie.split('; ').find(row => row.startsWith('readiness_user_id='))?.split('=')[1]
+        : null;
+
+      // 1. Fallback: check active Supabase Auth session if localStorage is empty
+      if (!session) {
+        try {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authUser.id)
+              .maybeSingle();
+
+            const role = profile?.role || (cookieRole as any) || 'student';
+            const constructed: UserProfile = {
+              id: authUser.id,
+              name: profile?.name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Student',
+              email: authUser.email || '',
+              role: role as any,
+              rollNumber: profile?.roll_number,
+              branch: profile?.branch,
+              degree: profile?.degree,
+              graduationYear: profile?.graduation_year,
+              cgpa: profile?.cgpa,
+              collegeName: profile?.college_id === 'col_nie' ? 'National Institute of Engineering' : undefined,
+              avatarUrl: profile?.avatar_url || authUser.user_metadata?.avatar_url,
+            };
+            saveSession(constructed);
+            session = constructed;
+          }
+        } catch (authErr) {
+          console.warn('Supabase auth fallback check warning:', authErr);
+        }
       }
-    } else {
-      router.push('/');
+
+      // 2. Fallback: check cookie user ID if still no session
+      if (!session && cookieUserId) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', cookieUserId)
+            .maybeSingle();
+
+          if (profile) {
+            const constructed: UserProfile = {
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role || (cookieRole as any) || 'student',
+              rollNumber: profile.roll_number,
+              branch: profile.branch,
+              degree: profile.degree,
+              graduationYear: profile.graduation_year,
+              cgpa: profile.cgpa,
+              collegeName: 'National Institute of Engineering',
+              avatarUrl: profile.avatar_url,
+            };
+            saveSession(constructed);
+            session = constructed;
+          }
+        } catch (dbErr) {
+          console.warn('Cookie profile lookup warning:', dbErr);
+        }
+      }
+
+      if (!isMounted) return;
+
+      if (session) {
+        if (session.role === 'coordinator' && cookieRole === 'coordinator' && session.email !== 'durgasravan21@gmail.com') {
+          router.replace('/tpc');
+        } else {
+          setUser(session);
+          fetchDashboardData(session.id);
+        }
+      } else {
+        // Unauthenticated -> cleanly redirect to /login
+        router.replace('/login');
+      }
     }
+
+    initSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   const fetchDashboardData = async (userId: string) => {
@@ -115,7 +196,14 @@ export default function StudentHomePage() {
     }
   };
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+        <p className="font-mono text-xs text-on-surface-variant">Connecting to institutional portal...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col pb-20 md:pb-10">

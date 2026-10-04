@@ -69,8 +69,23 @@ export function saveSession(user: UserProfile) {
 export function clearSession() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(AUTH_STORAGE_KEY);
-    document.cookie = 'readiness_role=; path=/; max-age=0';
-    document.cookie = 'readiness_user_id=; path=/; max-age=0';
+    localStorage.removeItem('readiness_user');
+    sessionStorage.clear();
+    document.cookie = 'readiness_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'readiness_user_id=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'readiness_onboarding_completed=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  }
+}
+
+export async function signOutUser() {
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+    } catch (e) {
+      console.warn('Signout API call notice:', e);
+    }
+    clearSession();
+    window.location.href = '/login';
   }
 }
 
